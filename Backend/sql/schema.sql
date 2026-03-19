@@ -72,16 +72,15 @@ CREATE TABLE IF NOT EXISTS fee_structures (
 -- 5. PAYMENTS
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS payments (
-  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  student_id            UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-  college_id            UUID NOT NULL REFERENCES colleges(id) ON DELETE CASCADE,
-  amount                NUMERIC(12,2) NOT NULL,
-  razorpay_order_id     TEXT,
-  razorpay_payment_id   TEXT,
-  razorpay_signature    TEXT,
-  status                TEXT NOT NULL DEFAULT 'created'
-                        CHECK (status IN ('created', 'paid', 'failed')),
-  created_at            TIMESTAMPTZ DEFAULT now()
+  id                           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id                   UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  college_id                   UUID NOT NULL REFERENCES colleges(id) ON DELETE CASCADE,
+  amount                       NUMERIC(12,2) NOT NULL,
+  stripe_checkout_session_id   TEXT,
+  stripe_payment_intent_id     TEXT,
+  status                       TEXT NOT NULL DEFAULT 'created'
+                               CHECK (status IN ('created', 'paid', 'failed')),
+  created_at                   TIMESTAMPTZ DEFAULT now()
 );
 
 -- ────────────────────────────────────────────────────────────
@@ -95,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_fee_structures_lookup
   ON fee_structures(college_id, course_type, stream, year, accommodation, academic_year);
 CREATE INDEX IF NOT EXISTS idx_payments_student_id  ON payments(student_id);
 CREATE INDEX IF NOT EXISTS idx_payments_college_id  ON payments(college_id);
-CREATE INDEX IF NOT EXISTS idx_payments_order_id    ON payments(razorpay_order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_stripe_session  ON payments(stripe_checkout_session_id);
 
 -- ============================================================
 -- 7. ROW LEVEL SECURITY (RLS)

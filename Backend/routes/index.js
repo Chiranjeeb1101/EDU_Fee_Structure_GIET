@@ -13,6 +13,6 @@ router.get('/health', (_req, res) => {
 router.use('/auth',     require('./auth.routes'));
 router.use('/admin',    require('./admin.routes'));
 router.use('/students', require('./student.routes'));
-// router.use('/payments', require('./payment.routes'));
+router.use('/payments', require('./payment.routes'));
 
 module.exports = router;

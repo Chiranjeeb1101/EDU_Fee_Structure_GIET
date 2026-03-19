@@ -3,18 +3,32 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 
 // ─── Import route aggregator ───────────────────────────────────────
 const routes = require('./routes');
+const { generalLimiter } = require('./middleware/rateLimiter');
+const { sanitize } = require('./middleware/validate');
 
 // ─── Initialise Express ────────────────────────────────────────────
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ─── Global middleware ─────────────────────────────────────────────
-app.use(cors());
+// ─── Security middleware ───────────────────────────────────────────
+app.use(helmet());                   // Secure HTTP headers
+app.use(cors());                     // Cross-Origin Resource Sharing
+app.use(generalLimiter);             // 100 req / 15 min per IP
+
+// ─── Stripe webhook needs RAW body — mount BEFORE express.json() ───
+app.use(
+  '/api/payments/webhook',
+  express.raw({ type: 'application/json' })
+);
+
+// ─── Body parsing for all other routes ─────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(sanitize);                   // Strip XSS from string inputs
 
 // ─── Mount routes ──────────────────────────────────────────────────
 app.use('/api', routes);
