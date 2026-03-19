@@ -7,6 +7,19 @@ const supabase = require('./config/supabase');
 async function testStripeFlow() {
   console.log('--- STRIPE E2E TEST ---');
 
+  const API = 'http://localhost:5000/api';
+
+  console.log('0️⃣ Seeding fee structure...');
+  const { data: feeseat } = await supabase.from('fee_structures').upsert({
+    college_id: process.env.DEFAULT_COLLEGE_ID,
+    course_type: 'B.Tech',
+    stream: 'CSE',
+    year: 1,
+    accommodation: 'day_scholar',
+    total_fee: 150000,
+    academic_year: '2025-26'
+  }, { onConflict: 'college_id, course_type, stream, year, accommodation, academic_year' });
+
   // 1. Create a student user or login
   const studentData = {
     full_name: 'Stripe Tester',
@@ -14,7 +27,7 @@ async function testStripeFlow() {
     password: 'Password123!',
   };
 
-  const API = 'http://localhost:5000/api';
+  // remove dup API
   
   console.log('1️⃣ Registering student...');
   let res = await fetch(`${API}/auth/register`, {
