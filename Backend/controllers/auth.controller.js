@@ -34,13 +34,38 @@ exports.login = async (req, res) => {
     });
   }
 
-  const result = await authService.login(college_id_number, password, college_id);
+  try {
+    const { token, user } = await authService.login(college_id_number, password, college_id);
 
-  res.status(200).json({
-    success: true,
-    message: 'Login successful.',
-    data: result,
-  });
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: { token, user }
+    });
+  } catch (error) {
+    res.status(401).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Register a device token for push notifications
+ */
+exports.registerDevice = async (req, res) => {
+  try {
+    const { device_token } = req.body;
+    const userId = req.user.id; // from JWT auth middleware
+
+    if (!device_token) {
+      return res.status(400).json({ success: false, message: 'Device token required' });
+    }
+
+    // Call service to update the user record
+    await authService.registerDeviceToken(userId, device_token);
+
+    res.status(200).json({ success: true, message: 'Device registered for notifications' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 exports.completeProfile = async (req, res) => {

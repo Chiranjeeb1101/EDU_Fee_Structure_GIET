@@ -216,6 +216,22 @@ class AuthService {
 
     return data;
   }
+  /**
+   * Register a user's device token for push notifications
+   */
+  async registerDeviceToken(userId, deviceToken) {
+    const { error } = await supabase
+      .from('users')
+      .update({ fcm_token: deviceToken }) // Ensure this column is created in the DB!
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Push token DB error:', error);
+      throw new Error('Failed to register device token.');
+    }
+
+    return true;
+  }
 }
 
 module.exports = new AuthService();

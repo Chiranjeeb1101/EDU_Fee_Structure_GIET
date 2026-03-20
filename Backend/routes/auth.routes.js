@@ -28,6 +28,13 @@ router.post(
   asyncHandler(authController.completeProfile)
 );
 
+router.post(
+  '/register-device',
+  authenticate,
+  validate({ body: ['device_token'] }),
+  asyncHandler(authController.registerDevice)
+);
+
 router.get('/profile', authenticate, asyncHandler(authController.getProfile));
 
 module.exports = router;

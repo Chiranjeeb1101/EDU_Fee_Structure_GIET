@@ -27,4 +27,7 @@ router.get('/history', asyncHandler(paymentController.getPaymentHistory));
 // ─── Student: Check single payment status ───────────────────────
 router.get('/status/:id', asyncHandler(paymentController.getPaymentStatus));
 
+// ─── Student: Download PDF receipt ──────────────────────────────
+router.get('/:id/receipt', asyncHandler(paymentController.getReceipt));
+
 module.exports = router;
