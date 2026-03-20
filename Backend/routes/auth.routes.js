@@ -36,5 +36,6 @@ router.post(
 );
 
 router.get('/profile', authenticate, asyncHandler(authController.getProfile));
+router.patch('/update-profile', authenticate, asyncHandler(authController.updateProfile));
 
 module.exports = router;

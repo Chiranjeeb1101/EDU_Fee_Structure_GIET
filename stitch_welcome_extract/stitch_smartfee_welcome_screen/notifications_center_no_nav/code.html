@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SmartFee Notifications</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&amp;family=Manrope:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary-fixed": "#000000",
+              "tertiary-dim": "#05a9e3",
+              "on-surface": "#e1e4fa",
+              "on-surface-variant": "#a6aabf",
+              "surface-container-highest": "#1e253b",
+              "on-secondary-fixed-variant": "#6514d6",
+              "on-tertiary": "#003b52",
+              "tertiary-container": "#2db7f2",
+              "outline": "#707588",
+              "surface-dim": "#090e1c",
+              "inverse-primary": "#0053dc",
+              "background": "#090e1c",
+              "primary": "#90abff",
+              "on-primary-fixed-variant": "#00266e",
+              "on-error-container": "#ffa8a3",
+              "surface": "#090e1c",
+              "secondary-fixed-dim": "#d0b8ff",
+              "on-tertiary-fixed-variant": "#003e56",
+              "primary-fixed-dim": "#658eff",
+              "tertiary": "#47c4ff",
+              "tertiary-fixed-dim": "#1bafe9",
+              "on-background": "#e1e4fa",
+              "error-container": "#9f0519",
+              "on-tertiary-fixed": "#001a27",
+              "on-primary": "#002873",
+              "inverse-on-surface": "#505466",
+              "secondary": "#af88ff",
+              "inverse-surface": "#faf8ff",
+              "primary-dim": "#316bf3",
+              "error": "#ff716c",
+              "on-tertiary-container": "#003044",
+              "secondary-dim": "#8a4cfc",
+              "outline-variant": "#434759",
+              "surface-container-high": "#181f33",
+              "on-secondary": "#2b0065",
+              "surface-container-low": "#0d1323",
+              "on-secondary-container": "#e1d0ff",
+              "error-dim": "#d7383b",
+              "on-secondary-fixed": "#430097",
+              "secondary-fixed": "#dcc9ff",
+              "on-error": "#490006",
+              "secondary-container": "#6001d1",
+              "surface-bright": "#242b43",
+              "primary-container": "#7b9cff",
+              "on-primary-container": "#001e5a",
+              "surface-tint": "#90abff",
+              "surface-container": "#13192b",
+              "primary-fixed": "#7b9cff",
+              "tertiary-fixed": "#37bcf7",
+              "surface-container-lowest": "#000000",
+              "surface-variant": "#1e253b"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(30, 37, 59, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .critical-glow {
+            box-shadow: 0 0 20px rgba(255, 113, 108, 0.15);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary selection:text-on-primary-fixed overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#090e1c] shadow-[0_0_40px_rgba(49,107,243,0.08)]">
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-[#1e253b] transition-colors active:scale-95 transition-transform text-[#90abff]">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-headline font-bold text-xl text-[#90abff] tracking-tight">Notifications</h1>
+</div>
+<button class="font-headline font-bold text-sm text-[#90abff] hover:bg-[#1e253b] transition-colors px-4 py-2 rounded-full active:scale-95 transition-transform">
+            Mark all as read
+        </button>
+</header>
+<main class="pt-24 px-6 max-w-4xl mx-auto space-y-12 pb-12">
+<!-- Section: Critical Alerts -->
+<section class="space-y-6">
+<div class="flex items-center justify-between">
+<h2 class="font-headline font-bold text-lg tracking-wide text-error flex items-center gap-2">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">emergency</span>
+                    Critical Alerts
+                </h2>
+<span class="bg-error/10 text-error px-3 py-1 rounded-full text-[10px] font-label uppercase tracking-widest font-bold">2 Urgent</span>
+</div>
+<div class="space-y-4">
+<!-- Alert 1 -->
+<div class="glass-card critical-glow rounded-lg p-5 relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1 h-full bg-error"></div>
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-12 h-12 rounded-full bg-error/10 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-2xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline font-bold text-base text-on-surface">Tuition Fee Due in 3 days</h3>
+<span class="text-on-surface-variant text-[11px] font-label">2h ago</span>
+</div>
+<p class="text-on-surface-variant text-sm leading-relaxed mb-3">Your Fall 2024 semester tuition fee of $12,450.00 is due soon. Avoid late penalties by paying before Friday.</p>
+<div class="flex gap-3">
+<button class="bg-error text-on-error px-4 py-2 rounded-full text-xs font-bold active:scale-95 transition-transform">Pay Now</button>
+<button class="bg-surface-container-highest text-on-surface px-4 py-2 rounded-full text-xs font-bold active:scale-95 transition-transform">View Details</button>
+</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-error shadow-[0_0_8px_#ff716c] flex-shrink-0 mt-2"></div>
+</div>
+</div>
+<!-- Alert 2 -->
+<div class="glass-card rounded-lg p-5 relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-error"></div>
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-12 h-12 rounded-full bg-error/10 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-2xl">credit_card_off</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline font-bold text-base text-on-surface">Failed Payment Attempt</h3>
+<span class="text-on-surface-variant text-[11px] font-label">5h ago</span>
+</div>
+<p class="text-on-surface-variant text-sm leading-relaxed">Automatic payment for 'Housing Installment' failed due to insufficient funds. Please top up your wallet.</p>
+</div>
+<div class="w-2 h-2 rounded-full bg-error shadow-[0_0_8px_#ff716c] flex-shrink-0 mt-2"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Updates -->
+<section class="space-y-6">
+<h2 class="font-headline font-bold text-lg tracking-wide text-primary flex items-center gap-2">
+<span class="material-symbols-outlined">auto_awesome</span>
+                Updates
+            </h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Update 1 -->
+<div class="glass-card rounded-lg p-5 border-l-4 border-primary">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline font-bold text-sm text-on-surface">Document Verified</h3>
+<span class="text-on-surface-variant text-[10px] font-label">Yesterday</span>
+</div>
+<p class="text-on-surface-variant text-xs leading-relaxed">Your proof of enrollment has been successfully verified by the registrar office.</p>
+</div>
+</div>
+</div>
+<!-- Update 2 -->
+<div class="glass-card rounded-lg p-5 border-l-4 border-tertiary">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-10 h-10 rounded-full bg-tertiary/10 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-xl">person</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline font-bold text-sm text-on-surface">Profile Picture Updated</h3>
+<span class="text-on-surface-variant text-[10px] font-label">2 days ago</span>
+</div>
+<p class="text-on-surface-variant text-xs leading-relaxed">Your new profile identification photo is now active across all student portals.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Announcements -->
+<section class="space-y-6">
+<h2 class="font-headline font-bold text-lg tracking-wide text-secondary flex items-center gap-2">
+<span class="material-symbols-outlined">campaign</span>
+                Announcements
+            </h2>
+<div class="space-y-4">
+<!-- Announcement 1 (Bento style) -->
+<div class="glass-card rounded-lg overflow-hidden flex flex-col md:flex-row h-auto md:h-48 group">
+<div class="w-full md:w-1/3 relative h-32 md:h-full">
+<img alt="New Cashback Offer" class="w-full h-full object-cover" data-alt="Vibrant digital pattern with coin symbols" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDnj7GszFoF-1Cn7erX36c2x46bH_Sm2sH_uxhjGqhC46-xOjKxURdPVHJYuGJ7ba6aAfxxIOw0I3ThjhnRBKAe1xtwkVSq3KjODpAVy6W9NO0Q6i6OzC9nTpKHxXzVbKcapohN_eY0ue9vAUJhZjwjObwDya6Ljq5rqjTpXb5FITRNxXVRlYjDm8WLV-EHeJ8PRYe3bt7Ldd4bXt3zT9etUIp07znuIlrcKUEEVenenh3baTpHm_JpbUb2DxnU1naCNQqUwLjgFs"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent md:bg-gradient-to-r"></div>
+</div>
+<div class="p-6 flex-1 flex flex-col justify-center">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-headline font-bold text-lg text-secondary">New Cashback Offer</h3>
+<span class="text-on-surface-variant text-[10px] font-label uppercase tracking-widest">Promotion</span>
+</div>
+<p class="text-on-surface-variant text-sm mb-4">Get up to 5% cashback on all cafeteria and campus bookstore purchases when using SmartFee Wallet this month.</p>
+<div class="flex items-center gap-2 text-[10px] font-label text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">schedule</span>
+                            Ends in 12 days
+                        </div>
+</div>
+</div>
+<!-- Announcement 2 -->
+<div class="glass-card rounded-lg p-5">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-2xl">event</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline font-bold text-base text-on-surface">Holiday Notice</h3>
+<span class="text-on-surface-variant text-[11px] font-label">Aug 15</span>
+</div>
+<p class="text-on-surface-variant text-sm leading-relaxed">The main campus administrative building will be closed for the National Holiday. Online support remains active.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+</body></html>

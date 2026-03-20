@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SmartFee - Recovery</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&amp;family=Manrope:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-secondary": "#2b0065",
+              "tertiary-fixed": "#37bcf7",
+              "on-tertiary-fixed": "#001a27",
+              "on-error-container": "#ffa8a3",
+              "secondary-container": "#6001d1",
+              "primary-fixed": "#7b9cff",
+              "on-tertiary-fixed-variant": "#003e56",
+              "inverse-surface": "#faf8ff",
+              "on-surface": "#e1e4fa",
+              "on-primary": "#002873",
+              "on-secondary-fixed-variant": "#6514d6",
+              "surface": "#090e1c",
+              "outline": "#707588",
+              "surface-variant": "#1e253b",
+              "on-tertiary": "#003b52",
+              "error-container": "#9f0519",
+              "on-primary-container": "#001e5a",
+              "primary-container": "#7b9cff",
+              "on-primary-fixed": "#000000",
+              "surface-dim": "#090e1c",
+              "tertiary": "#47c4ff",
+              "secondary-fixed-dim": "#d0b8ff",
+              "error": "#ff716c",
+              "surface-container-high": "#181f33",
+              "primary-fixed-dim": "#658eff",
+              "surface-tint": "#90abff",
+              "secondary-dim": "#8a4cfc",
+              "primary": "#90abff",
+              "on-tertiary-container": "#003044",
+              "surface-container": "#13192b",
+              "on-error": "#490006",
+              "on-secondary-fixed": "#430097",
+              "inverse-on-surface": "#505466",
+              "secondary": "#af88ff",
+              "on-surface-variant": "#a6aabf",
+              "surface-bright": "#242b43",
+              "primary-dim": "#316bf3",
+              "inverse-primary": "#0053dc",
+              "surface-container-highest": "#1e253b",
+              "on-secondary-container": "#e1d0ff",
+              "tertiary-dim": "#05a9e3",
+              "tertiary-container": "#2db7f2",
+              "on-background": "#e1e4fa",
+              "on-primary-fixed-variant": "#00266e",
+              "outline-variant": "#434759",
+              "surface-container-low": "#0d1323",
+              "tertiary-fixed-dim": "#1bafe9",
+              "surface-container-lowest": "#000000",
+              "error-dim": "#d7383b",
+              "secondary-fixed": "#dcc9ff",
+              "background": "#090e1c"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Manrope"],
+              "label": ["Manrope"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-nebula {
+            background: radial-gradient(circle at 20% 30%, rgba(144, 171, 255, 0.15) 0%, transparent 40%),
+                        radial-gradient(circle at 80% 70%, rgba(175, 136, 255, 0.1) 0%, transparent 40%),
+                        linear-gradient(180deg, #090e1c 0%, #0d0b2a 100%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-nebula min-h-screen text-on-surface font-body overflow-x-hidden selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-transparent backdrop-blur-xl shadow-[0_0_20px_rgba(49,107,243,0.08)]">
+<div class="flex items-center px-6 h-16 w-full">
+<button class="flex items-center justify-center w-10 h-10 text-[#90abff] hover:bg-[#1e253b]/50 transition-all active:scale-95 duration-200 rounded-full">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-['Plus_Jakarta_Sans'] font-bold text-lg tracking-tight text-[#90abff] ml-4">Recovery</h1>
+</div>
+</header>
+<main class="relative flex flex-col items-center justify-center min-h-screen px-6 pt-20 pb-12">
+<!-- Abstract Glow Elements -->
+<div class="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/10 rounded-full blur-[100px] -z-10"></div>
+<div class="absolute bottom-1/4 right-1/4 w-80 h-80 bg-secondary/10 rounded-full blur-[120px] -z-10"></div>
+<!-- Central Recovery Card -->
+<div class="glass-card w-full max-w-md rounded-lg p-8 md:p-10 flex flex-col items-center text-center">
+<!-- Illustration / Icon -->
+<div class="relative mb-8">
+<div class="absolute inset-0 bg-primary/20 blur-2xl rounded-full"></div>
+<div class="relative w-24 h-24 rounded-full bg-surface-container-highest flex items-center justify-center border border-white/10 shadow-[0_0_30px_rgba(144,171,255,0.2)]">
+<span class="material-symbols-outlined text-5xl text-primary" data-icon="lock_reset" style="font-variation-settings: 'FILL' 1;">lock_reset</span>
+</div>
+</div>
+<!-- Typography Content -->
+<h2 class="font-headline text-3xl md:text-4xl text-on-surface mb-3 tracking-tight">Forgot Password?</h2>
+<p class="font-body text-on-surface-variant text-base leading-relaxed mb-10 max-w-xs mx-auto">
+                No worries, it happens. Enter your registered email or student ID to reset your password.
+            </p>
+<!-- Recovery Form -->
+<form class="w-full space-y-6">
+<div class="group">
+<label class="block text-left text-[11px] font-label font-medium uppercase tracking-[0.1em] text-on-surface-variant mb-2 ml-1">Email or Student ID</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-on-surface-variant group-focus-within:text-tertiary transition-colors">
+<span class="material-symbols-outlined" data-icon="mail">mail</span>
+</div>
+<input class="w-full bg-surface-container-highest border-0 focus:ring-2 focus:ring-secondary/50 rounded-md py-4 pl-12 pr-4 text-on-surface placeholder:text-outline/50 font-body transition-all" placeholder="e.g. name@university.edu" type="text"/>
+</div>
+</div>
+<!-- Primary Action -->
+<button class="w-full py-4 rounded-full bg-gradient-to-r from-primary-fixed to-primary-dim text-on-primary-fixed font-bold tracking-tight shadow-[0_10px_30px_rgba(49,107,243,0.3)] hover:shadow-[0_15px_40px_rgba(49,107,243,0.5)] active:scale-[0.98] transition-all duration-300" type="submit">
+                    Send Reset Link
+                </button>
+</form>
+<!-- Footer Link -->
+<div class="mt-8">
+<a class="inline-flex items-center text-secondary font-medium hover:text-primary transition-colors gap-2 group" href="#">
+<span class="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform" data-icon="arrow_back">arrow_back</span>
+<span class="text-sm tracking-wide">Back to Login</span>
+</a>
+</div>
+</div>
+<!-- Decorative Info Card (Asymmetric Layout Hint) -->
+<div class="mt-12 glass-card rounded-md p-4 max-w-sm flex items-start gap-4 text-left border-l-4 border-l-tertiary">
+<span class="material-symbols-outlined text-tertiary mt-0.5" data-icon="info">info</span>
+<div>
+<p class="text-xs font-label uppercase tracking-widest text-tertiary mb-1">Security Tip</p>
+<p class="text-xs text-on-surface-variant leading-relaxed">Ensure you have access to your primary academic inbox before requesting a link.</p>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Suppressed for focused transactional screen, but following structure if it was a destination) -->
+<!-- Suppressed based on "The Destination Rule" - Forgot Password is a Focused Journey -->
+</body></html>

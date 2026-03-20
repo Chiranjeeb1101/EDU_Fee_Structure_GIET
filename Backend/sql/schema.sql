@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS users (
   college_id  UUID NOT NULL REFERENCES colleges(id) ON DELETE CASCADE,
   email       TEXT,
   full_name   TEXT NOT NULL,
+  profile_picture TEXT,         -- New: store base64 or URL
+  personal_email  TEXT,         -- New: user's provided email
   role        TEXT NOT NULL CHECK (role IN ('student', 'admin')),
   created_at  TIMESTAMPTZ DEFAULT now()
 );
@@ -43,6 +45,9 @@ CREATE TABLE IF NOT EXISTS students (
   total_fee          NUMERIC(12,2) DEFAULT 0,
   paid_fee           NUMERIC(12,2) DEFAULT 0,
   remaining_fee      NUMERIC(12,2) DEFAULT 0,
+  student_phone      TEXT,                           -- New field
+  parent_name        TEXT,                           -- New field
+  parent_whatsapp    TEXT,                           -- New field
   profile_complete   BOOLEAN DEFAULT false,
   created_at         TIMESTAMPTZ DEFAULT now(),
 

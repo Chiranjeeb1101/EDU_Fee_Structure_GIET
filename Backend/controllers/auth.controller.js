@@ -1,7 +1,7 @@
 const authService = require('../services/auth.service');
 
 exports.register = async (req, res) => {
-  const { full_name, college_id_number, password, college_id } = req.body;
+  const { full_name, college_id_number, password } = req.body;
 
   if (!full_name || !college_id_number || !password) {
     return res.status(400).json({
@@ -10,12 +10,7 @@ exports.register = async (req, res) => {
     });
   }
 
-  const result = await authService.registerStudent({
-    full_name,
-    college_id_number,
-    password,
-    college_id,
-  });
+  const result = await authService.registerStudent(req.body);
 
   res.status(201).json({
     success: true,
@@ -101,5 +96,16 @@ exports.getProfile = async (req, res) => {
   res.status(200).json({
     success: true,
     data: profile,
+  });
+};
+
+exports.updateProfile = async (req, res) => {
+  const userId = req.user.id;
+  const updatedProfile = await authService.updateProfile(userId, req.body);
+
+  res.status(200).json({
+    success: true,
+    message: 'Profile updated successfully.',
+    data: updatedProfile,
   });
 };

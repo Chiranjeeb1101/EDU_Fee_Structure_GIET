@@ -1,0 +1,125 @@
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
+import { AuthProvider } from './src/context/AuthContext';
+import { WelcomeScreen } from './src/screens/auth/WelcomeScreen';
+import { LoginScreen } from './src/screens/auth/LoginScreen';
+import { ForgotPasswordScreen } from './src/screens/auth/ForgotPasswordScreen';
+import { SupportCenterScreen } from './src/screens/auth/SupportCenterScreen';
+import { RegisterScreen } from './src/screens/auth/RegisterScreen';
+import { RegistrationSuccessScreen } from './src/screens/auth/RegistrationSuccessScreen';
+import { DashboardScreen } from './src/screens/dashboard/DashboardScreen';
+import { NotificationScreen } from './src/screens/dashboard/NotificationScreen';
+import { HistoryScreen } from './src/screens/dashboard/HistoryScreen';
+import { ReceiptsScreen } from './src/screens/dashboard/ReceiptsScreen';
+import { CalendarScreen } from './src/screens/dashboard/CalendarScreen';
+import { DocumentsScreen } from './src/screens/dashboard/DocumentsScreen';
+import { SettingsScreen } from './src/screens/dashboard/SettingsScreen';
+import { ProfileScreen } from './src/screens/dashboard/ProfileScreen';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { BottomNav } from './src/components/navigation/BottomNav';
+import { PanResponder, View } from 'react-native';
+
+// Global context to track if Navbar should be visible
+export const NavContext = React.createContext({ isNavVisible: true });
+
+export type RootStackParamList = {
+  Welcome: undefined;
+  Login: undefined;
+  ForgotPassword: undefined;
+  SupportCenter: undefined;
+  Register: undefined;
+  RegistrationSuccess: undefined;
+  MainTabs: { screen: string } | undefined;
+  Notification: undefined;
+  Calendar: undefined;
+  Profile: undefined;
+  // Tab screens listed for TS composite navigation inference
+  Dashboard: undefined;
+  History: undefined;
+  Receipts: undefined;
+  Documents: undefined;
+  Settings: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator();
+
+function MainTabs() {
+  return (
+    <Tab.Navigator 
+      initialRouteName="Dashboard" 
+      tabBar={props => <BottomNav {...props} />} 
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="History" component={HistoryScreen} />
+      <Tab.Screen name="Receipts" component={ReceiptsScreen} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} />
+      <Tab.Screen name="Documents" component={DocumentsScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
+    </Tab.Navigator>
+  );
+}
+
+export default function App() {
+  const [isNavVisible, setIsNavVisible] = React.useState(true);
+  const idleTimer = React.useRef<NodeJS.Timeout | null>(null);
+
+  const resetIdleTimer = () => {
+    setIsNavVisible(true);
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      setIsNavVisible(false);
+    }, 3000); // 3 seconds idle time
+  };
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponderCapture: () => {
+        resetIdleTimer();
+        return false; // let touch pass through
+      },
+      onMoveShouldSetPanResponderCapture: () => {
+        resetIdleTimer();
+        return false;
+      },
+    })
+  ).current;
+
+  React.useEffect(() => {
+    resetIdleTimer();
+    return () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, []);
+
+  return (
+    <AuthProvider>
+    <NavContext.Provider value={{ isNavVisible }}>
+      <View style={{ flex: 1 }} {...panResponder.panHandlers}>
+        <NavigationContainer>
+          <StatusBar style="light" />
+          <Stack.Navigator 
+            screenOptions={{ 
+              headerShown: false,
+              animation: 'fade_from_bottom', // smooth stack transitions
+            }}
+          >
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="SupportCenter" component={SupportCenterScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="RegistrationSuccess" component={RegistrationSuccessScreen} />
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+            <Stack.Screen name="Notification" component={NotificationScreen} />
+            <Stack.Screen name="Calendar" component={CalendarScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </View>
+    </NavContext.Provider>
+    </AuthProvider>
+  );
+}

@@ -8,7 +8,11 @@ class AuthService {
    * Supabase Auth requires an email, but users will log in via college_id_number.
    */
   async registerStudent(data) {
-    const { full_name, college_id_number, password, college_id } = data;
+    const { 
+      full_name, college_id_number, password, college_id,
+      personal_email, profile_picture, course_type, stream, 
+      year, accommodation, student_phone, parent_name, parent_whatsapp
+    } = data;
     
     // Default to environment college ID if not provided
     const targetCollegeId = college_id || process.env.DEFAULT_COLLEGE_ID;
@@ -38,6 +42,8 @@ class AuthService {
           auth_id: authId,
           college_id: targetCollegeId,
           email: generatedEmail,
+          personal_email: personal_email || null,
+          profile_picture: profile_picture || null,
           full_name,
           role: 'student',
         },
@@ -59,6 +65,13 @@ class AuthService {
           user_id: newUser.id,
           college_id: targetCollegeId,
           college_id_number,
+          course_type: course_type || null,
+          stream: stream || null,
+          year: year ? parseInt(year.toString().replace(/\D/g, ''), 10) : null, // Extract number from "1st Year" if passed
+          accommodation: accommodation || null,
+          student_phone: student_phone || null,
+          parent_name: parent_name || null,
+          parent_whatsapp: parent_whatsapp || null,
         },
       ])
       .select()
@@ -216,6 +229,7 @@ class AuthService {
 
     return data;
   }
+
   /**
    * Register a user's device token for push notifications
    */
@@ -231,6 +245,49 @@ class AuthService {
     }
 
     return true;
+  }
+
+  /**
+   * Update profile details for a student
+   */
+  async updateProfile(userId, updateData) {
+    const { 
+      full_name, personal_email, profile_picture,
+      student_phone, parent_name, parent_whatsapp
+    } = updateData;
+
+    // 1. Update `users` table
+    const userUpdates = {};
+    if (full_name) userUpdates.full_name = full_name;
+    if (personal_email !== undefined) userUpdates.personal_email = personal_email;
+    if (profile_picture !== undefined) userUpdates.profile_picture = profile_picture;
+
+    if (Object.keys(userUpdates).length > 0) {
+      const { error: userError } = await supabase
+        .from('users')
+        .update(userUpdates)
+        .eq('id', userId);
+
+      if (userError) throw Object.assign(new Error(`Failed to update user: ${userError.message}`), { statusCode: 500 });
+    }
+
+    // 2. Update `students` table
+    const studentUpdates = {};
+    if (student_phone !== undefined) studentUpdates.student_phone = student_phone;
+    if (parent_name !== undefined) studentUpdates.parent_name = parent_name;
+    if (parent_whatsapp !== undefined) studentUpdates.parent_whatsapp = parent_whatsapp;
+
+    if (Object.keys(studentUpdates).length > 0) {
+      const { error: studentError } = await supabase
+        .from('students')
+        .update(studentUpdates)
+        .eq('user_id', userId);
+
+      if (studentError) throw Object.assign(new Error(`Failed to update student details: ${studentError.message}`), { statusCode: 500 });
+    }
+
+    // 3. Return full updated profile
+    return this.getProfile(userId);
   }
 }
 
