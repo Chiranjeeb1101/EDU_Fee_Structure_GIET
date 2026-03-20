@@ -1,0 +1,300 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7g8h-9i0j",
+    "name": "Smart Fee Management System - API",
+    "description": "API collection for the Smart Fee Management System backend with Stripe payment integration.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. System",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register Student",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"John Doe\",\n  \"college_id_number\": \"GIET1234\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Log In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "if (response.success && response.data.token) {",
+                  "    pm.collectionVariables.set(\"jwt_token\", response.data.token);",
+                  "    console.log(\"JWT Token set automatically.\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"college_id_number\": \"GIET1234\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Complete Profile (First Time)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_type\": \"B.Tech\",\n  \"stream\": \"CSE\",\n  \"year\": 1,\n  \"accommodation\": \"day_scholar\",\n  \"academic_year\": \"2025-26\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/complete-profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "complete-profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Authenticated Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Admin Controls",
+      "item": [
+        {
+          "name": "Create Fee Structure",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_type\": \"B.Tech\",\n  \"stream\": \"CSE\",\n  \"year\": 1,\n  \"accommodation\": \"hosteler\",\n  \"total_fee\": 180000,\n  \"academic_year\": \"2025-26\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/fee-structures",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "fee-structures"]
+            }
+          }
+        },
+        {
+          "name": "List All Fee Structures",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/fee-structures",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "fee-structures"]
+            }
+          }
+        },
+        {
+          "name": "Update Fee Structure",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"total_fee\": 185000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/fee-structures/:feeId",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "fee-structures", ":feeId"],
+              "variable": [
+                { "key": "feeId", "value": "REPLACE_WITH_FEE_ID" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List All Students",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/students",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "students"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Student Portal",
+      "item": [
+        {
+          "name": "Get Dashboard Data",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/students/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["students", "dashboard"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Stripe Payments",
+      "item": [
+        {
+          "name": "Create Checkout Session",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payments/create-checkout-session",
+              "host": ["{{baseUrl}}"],
+              "path": ["payments", "create-checkout-session"]
+            }
+          }
+        },
+        {
+          "name": "Get Payment History",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payments/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["payments", "history"]
+            }
+          }
+        },
+        {
+          "name": "Check Single Payment Status",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payments/status/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["payments", "status", ":id"],
+              "variable": [
+                { "key": "id", "value": "REPLACE_WITH_PAYMENT_ID" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
