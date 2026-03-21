@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Tex
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
+import studentService, { PaymentHistoryItem } from '../../services/studentService';
+import { ActivityIndicator, Alert } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -60,17 +62,35 @@ export const HistoryScreen = () => {
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('All Fees');
+  const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState<PaymentHistoryItem[]>([]);
+
+  React.useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async () => {
+    try {
+      const data = await studentService.getPaymentHistory();
+      setTransactions(data);
+    } catch (error) {
+      console.error('History fetch failed:', error);
+      // Fallback or alert
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredTransactions = useMemo(() => {
-    return MOCK_TRANSACTIONS.filter(tx => {
-      const matchesSearch = tx.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    return transactions.filter(tx => {
+      const matchesSearch = tx.razorpay_order_id.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             tx.id.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesFilter = activeFilter === 'All Fees' || 
-                            (activeFilter === 'Dues' && (tx.status === 'Due' || tx.status === 'Pending')) ||
-                            tx.category === activeFilter;
+                            (activeFilter === 'Dues' && (tx.status === 'due' || tx.status === 'pending')) ||
+                            tx.status.toLowerCase() === activeFilter.toLowerCase();
       return matchesSearch && matchesFilter;
     });
-  }, [searchQuery, activeFilter]);
+  }, [searchQuery, activeFilter, transactions]);
 
   const handleFilterPress = (filter: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -117,7 +137,7 @@ export const HistoryScreen = () => {
 
           {/* Filters */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersScroll} contentContainerStyle={{ paddingRight: 24 }}>
-            {['All Fees', 'Dues', 'Semester Fee', 'Library', 'Exam'].map(filter => (
+            {['All Fees', 'Dues', 'Captured', 'Pending', 'Failed'].map(filter => (
               <FilterBadge 
                 key={filter} 
                 label={filter} 
@@ -129,17 +149,33 @@ export const HistoryScreen = () => {
 
           {/* Transaction List */}
           <View style={styles.txList}>
-            {filteredTransactions.length === 0 ? (
-              <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 20 }}>No transactions found.</Text>
+            {loading ? (
+              <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+            ) : filteredTransactions.length === 0 ? (
+              <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 40 }}>No transactions found.</Text>
             ) : (
-              filteredTransactions.map(tx => (
-                <TransactionItem 
-                  key={tx.id}
-                  title={tx.title}
-                  date={tx.date} id={tx.id} amount={tx.amount} status={tx.status}
-                  icon={tx.icon} iconColor={tx.iconColor} statusColor={tx.statusColor}
-                />
-              ))
+              filteredTransactions.map(tx => {
+                // Map status to colors/icons
+                let statusColor = colors.success;
+                let icon = 'check-circle';
+                if (tx.status === 'pending') { statusColor = colors.warning; icon = 'schedule'; }
+                if (tx.status === 'failed') { statusColor = colors.error; icon = 'error-outline'; }
+                if (tx.status === 'due') { statusColor = colors.error; icon = 'assignment-late'; }
+
+                return (
+                  <TransactionItem 
+                    key={tx.id}
+                    title={tx.razorpay_order_id ? `Order: ${tx.razorpay_order_id.substring(0, 10)}...` : 'Institutional Fee'}
+                    date={new Date(tx.created_at).toLocaleDateString()} 
+                    id={tx.id.substring(0, 8)} 
+                    amount={tx.amount.toLocaleString()} 
+                    status={tx.status}
+                    icon={icon} 
+                    iconColor={statusColor} 
+                    statusColor={statusColor}
+                  />
+                );
+              })
             )}
           </View>
 

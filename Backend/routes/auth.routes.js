@@ -37,5 +37,6 @@ router.post(
 
 router.get('/profile', authenticate, asyncHandler(authController.getProfile));
 router.patch('/update-profile', authenticate, asyncHandler(authController.updateProfile));
+router.post('/change-password', authenticate, validate({ body: ['old_password', 'new_password'] }), asyncHandler(authController.changePassword));
 
 module.exports = router;

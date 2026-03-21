@@ -105,7 +105,7 @@ class AdminService {
       .from('students')
       .select(`
         *,
-        users ( full_name, email )
+        users ( full_name, email, personal_email )
       `)
       .eq('college_id', adminCollegeId)
       .order('created_at', { ascending: false });
@@ -118,6 +118,137 @@ class AdminService {
   }
 
   /**
+   * Get a single student by ID
+   */
+  async getStudentById(adminCollegeId, studentId) {
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('*, users(full_name, email, personal_email, profile_picture)')
+      .eq('id', studentId)
+      .eq('college_id', adminCollegeId)
+      .single();
+
+    if (studentError || !student) {
+      throw Object.assign(new Error('Student not found.'), { statusCode: 404 });
+    }
+
+    const { data: payments, error: paymentsError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false });
+
+    return { ...student, payments: payments || [] };
+  }
+
+  /**
+   * Update student details
+   */
+  async updateStudent(adminCollegeId, studentId, updates) {
+    const { data, error } = await supabase
+      .from('students')
+      .update(updates)
+      .eq('id', studentId)
+      .eq('college_id', adminCollegeId)
+      .select()
+      .single();
+
+    if (error) throw Object.assign(new Error(error.message), { statusCode: 500 });
+    return data;
+  }
+
+  /**
+   * Delete a student
+   */
+  async deleteStudent(adminCollegeId, studentId) {
+    const { data, error } = await supabase
+      .from('students')
+      .delete()
+      .eq('id', studentId)
+      .eq('college_id', adminCollegeId)
+      .select()
+      .single();
+
+    if (error) throw Object.assign(new Error(error.message), { statusCode: 500 });
+    
+    // Attempt deleting user from users table (cascades)
+    if (data && data.user_id) {
+      await supabase.from('users').delete().eq('id', data.user_id);
+    }
+    
+    return true;
+  }
+
+  /**
+   * Get all payments across the college
+   */
+  async getAllPayments(adminCollegeId) {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*, students(college_id_number, course_type, stream, users(full_name))')
+      .eq('college_id', adminCollegeId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw Object.assign(new Error(error.message), { statusCode: 500 });
+    return data;
+  }
+
+  /**
+   * Get KPI Stats for Dashboard
+   */
+  async getAdminStats(adminCollegeId) {
+    const { count: totalStudents } = await supabase
+      .from('students')
+      .select('*', { count: 'exact', head: true })
+      .eq('college_id', adminCollegeId);
+
+    const { count: activeFeeStructures } = await supabase
+      .from('fee_structures')
+      .select('*', { count: 'exact', head: true })
+      .eq('college_id', adminCollegeId);
+
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('amount, status')
+      .eq('college_id', adminCollegeId);
+
+    let totalCollected = 0;
+    let totalPendingAmount = 0; // Requires aggregating remaining fees from students
+    let recentPaymentsCount = 0;
+
+    if (payments) {
+      totalCollected = payments
+        .filter(p => p.status === 'success' || p.status === 'paid' || p.status === 'captured')
+        .reduce((sum, p) => sum + Number(p.amount), 0);
+    }
+
+    const { data: students } = await supabase
+      .from('students')
+      .select('remaining_fee, total_fee')
+      .eq('college_id', adminCollegeId);
+
+    if (students) {
+      totalPendingAmount = students.reduce((sum, s) => sum + Number(s.remaining_fee), 0);
+    }
+
+    const { data: recentPayments } = await supabase
+      .from('payments')
+      .select('*, students(users(full_name))')
+      .eq('college_id', adminCollegeId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    return {
+      total_students: totalStudents || 0,
+      active_fee_structures: activeFeeStructures || 0,
+      total_collected: totalCollected,
+      total_pending: totalPendingAmount,
+      recent_payments: recentPayments || []
+    };
+  }
+
+  /**
+
    * Create an admin user manually (seeded directly into DB + Supabase Auth)
    */
   async createAdmin(data) {

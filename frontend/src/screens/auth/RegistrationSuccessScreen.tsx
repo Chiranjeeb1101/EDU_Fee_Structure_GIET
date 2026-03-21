@@ -1,15 +1,22 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Platform, Dimensions, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../App';
 import { colors } from '../../theme/colors';
+import { useAuth } from '../../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 export const RegistrationSuccessScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'RegistrationSuccess'>>();
+  const { user: authUser } = useAuth();
+
+  // Combine data from params or auth context
+  const user = route.params?.user || authUser;
+  const student = route.params?.student || (authUser as any)?.students?.[0];
 
   return (
     <View style={styles.container}>
@@ -27,7 +34,7 @@ export const RegistrationSuccessScreen = () => {
             </View>
             <Text style={styles.title}>
               Welcome to{'\n'}
-              <Text style={styles.titleHighlight}>Luminous Ledger</Text>
+              <Text style={styles.titleHighlight}>EDU-Fee</Text>
             </Text>
             <Text style={styles.subtitle}>
               Your digital student identity has been generated and secured.
@@ -62,7 +69,7 @@ export const RegistrationSuccessScreen = () => {
                   <View style={styles.avatarContainer}>
                     <View style={styles.avatarGlow}>
                       <Image 
-                        source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDO0qHbcEd2uUOuns2ESwrNiTwUiUyWxhQXXZIbmtBXhZbEmIiBrtsrkaSVNOcW6ghRpaZDONShXHerVcphZ3fiCAwEYag1B9Ku4tn-fqgKfMKDc2EeBdIeaZA2lxRsJLUiuSoMkXG5_9AcXEC_WtexZGDSVz668NOW0PR4q1mv8RqUTPPiJfdDZRhLhpG6MSTm6AB7IyK65ZilrjcZVmPtxng--UXSSaTdWN2vtUgfIgRSNN8RYgtQ_3diznIWODmepMSyRq5EmAw' }} 
+                        source={{ uri: user?.profile_picture || 'https://lh3.googleusercontent.com/aida-public/AB6AXuAP7c6BKhlg06MLobhj0M2A7aFjdsRXxVarCJoKlNsWM69F4glA_7JmXiOr86Is6g70T3DWr2XUvQK5JF0gMKLqTnC8UpACxoqSMF57ee8uFohF0juMeRgX5Vs_R0ASSMl9VdiWbL31t2Di2XVUIdLX2gm7x30ykuZQmjZS195IF9VBecZyLR8d_UXVknhN0CLwIvBdnTHwzjGeCau0dcM5XqEimb3wzc9S_kX6BDbc3PIdy48DR3qsjv8m5o1O8hd00g9LI8mOWJw' }} 
                         style={styles.avatarImage} 
                       />
                     </View>
@@ -71,11 +78,11 @@ export const RegistrationSuccessScreen = () => {
                     </View>
                   </View>
                   
-                  <Text style={styles.profileName}>Alex Rivera</Text>
+                   <Text style={styles.profileName}>{user?.full_name || 'Student Name'}</Text>
                   
                   <View style={styles.regBadge}>
                     <Text style={styles.regLabel}>REG ID</Text>
-                    <Text style={styles.regValue}>2026-XXXX-XXXX</Text>
+                    <Text style={styles.regValue}>{student?.college_id_number || user?.college_id_number || '2026-XXXX-XXXX'}</Text>
                   </View>
                 </View>
 
@@ -83,11 +90,11 @@ export const RegistrationSuccessScreen = () => {
                 <View style={styles.detailsGrid}>
                   <View>
                     <Text style={styles.detailLabel}>DEPARTMENT</Text>
-                    <Text style={styles.detailValue}>Computer Science & Engineering</Text>
+                    <Text style={styles.detailValue}>{student?.stream || user?.stream || 'N/A'}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.detailLabel}>VALID UNTIL</Text>
-                    <Text style={[styles.detailValue, { textTransform: 'uppercase' }]}>August 2026</Text>
+                    <Text style={styles.detailLabel}>COURSE TYPE</Text>
+                    <Text style={[styles.detailValue, { textTransform: 'uppercase' }]}>{student?.course_type || user?.course_type || 'N/A'}</Text>
                   </View>
                 </View>
 

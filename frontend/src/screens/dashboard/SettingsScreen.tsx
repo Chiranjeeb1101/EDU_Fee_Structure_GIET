@@ -4,9 +4,10 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const SettingsItem = ({ icon, title, showToggle, toggleActive, onToggle, colorClass }: any) => (
-  <TouchableOpacity style={styles.settingsItem} onPress={showToggle ? onToggle : undefined} activeOpacity={showToggle ? 0.8 : 0.2}>
+const SettingsItem = ({ icon, title, showToggle, toggleActive, onToggle, colorClass, onPress }: any) => (
+  <TouchableOpacity style={styles.settingsItem} onPress={onToggle || onPress} activeOpacity={showToggle || onPress ? 0.8 : 0.2}>
     <View style={styles.siLeft}>
       <MaterialIcons name={icon} size={20} color={colors.textSecondary} />
       <Text style={styles.siTitle}>{title}</Text>
@@ -32,7 +33,61 @@ export const SettingsScreen = () => {
   const [confirmations, setConfirmations] = React.useState(true);
   const [newsletter, setNewsletter] = React.useState(false);
   const [whatsapp, setWhatsapp] = React.useState(true);
-  const [biometrics, setBiometrics] = React.useState(false);
+
+  // Load persistence
+  React.useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const saved = await AsyncStorage.getItem('user_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setReminders(parsed.reminders ?? true);
+          setConfirmations(parsed.confirmations ?? true);
+          setNewsletter(parsed.newsletter ?? false);
+          setWhatsapp(parsed.whatsapp ?? true);
+        }
+      } catch (e) {
+        console.warn('Failed to load settings', e);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  // Save persistence helper
+  const saveSetting = async (key: string, value: boolean) => {
+    try {
+      const current = await AsyncStorage.getItem('user_settings');
+      const settings = current ? JSON.parse(current) : {};
+      settings[key] = value;
+      await AsyncStorage.setItem('user_settings', JSON.stringify(settings));
+    } catch (e) {
+      console.error('Failed to save setting', e);
+    }
+  };
+
+  const toggleReminder = () => {
+    const newVal = !reminders;
+    setReminders(newVal);
+    saveSetting('reminders', newVal);
+  };
+
+  const toggleConfirmation = () => {
+    const newVal = !confirmations;
+    setConfirmations(newVal);
+    saveSetting('confirmations', newVal);
+  };
+
+  const toggleNewsletter = () => {
+    const newVal = !newsletter;
+    setNewsletter(newVal);
+    saveSetting('newsletter', newVal);
+  };
+
+  const toggleWhatsapp = () => {
+    const newVal = !whatsapp;
+    setWhatsapp(newVal);
+    saveSetting('whatsapp', newVal);
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -93,7 +148,7 @@ export const SettingsScreen = () => {
           <View style={styles.sectionBlock}>
             <Text style={styles.sectionHeader}>ACCOUNT SETTINGS</Text>
             <View style={styles.grid2Col}>
-              <View style={[styles.glassCard, styles.colSpan2]}>
+              <TouchableOpacity style={[styles.glassCard, styles.colSpan2]} activeOpacity={0.8} onPress={() => Alert.alert("Linked Accounts", "Securely connect your institutional or personal bank accounts for instant fee settlements.")}>
                 <View style={styles.accLeft}>
                   <View style={[styles.iconBox, { backgroundColor: 'rgba(144, 171, 255, 0.1)' }]}>
                     <MaterialIcons name="account-balance" size={24} color={colors.primary} />
@@ -104,9 +159,9 @@ export const SettingsScreen = () => {
                   </View>
                 </View>
                 <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
-              </View>
+              </TouchableOpacity>
 
-              <View style={styles.glassCardSq}>
+              <TouchableOpacity style={styles.glassCardSq} activeOpacity={0.8} onPress={() => (navigation as any).navigate('PaymentMethods')}>
                 <View style={[styles.iconBoxSq, { backgroundColor: 'rgba(175, 136, 255, 0.1)' }]}>
                   <MaterialIcons name="payments" size={24} color={colors.secondary} />
                 </View>
@@ -114,9 +169,9 @@ export const SettingsScreen = () => {
                   <Text style={styles.cardTitle}>Payment Methods</Text>
                   <Text style={styles.cardSub}>Visa •••• 4242</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
-              <View style={styles.glassCardSq}>
+              <TouchableOpacity style={styles.glassCardSq} activeOpacity={0.8} onPress={() => Alert.alert("Currency Configuration", "Multi-currency support is coming soon for international payments.")}>
                 <View style={[styles.iconBoxSq, { backgroundColor: 'rgba(71, 196, 255, 0.1)' }]}>
                   <MaterialIcons name="currency-exchange" size={24} color={colors.tertiary} />
                 </View>
@@ -124,7 +179,7 @@ export const SettingsScreen = () => {
                   <Text style={styles.cardTitle}>Currency Config</Text>
                   <Text style={styles.cardSub}>INR (₹)</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -132,11 +187,11 @@ export const SettingsScreen = () => {
           <View style={styles.sectionBlock}>
             <Text style={styles.sectionHeader}>PREFERENCES</Text>
             <View style={styles.listContainer}>
-              <SettingsItem icon="notifications-active" title="Due Date Reminders" showToggle toggleActive={reminders} onToggle={() => setReminders(!reminders)} />
+              <SettingsItem icon="notifications-active" title="Due Date Reminders" showToggle toggleActive={reminders} onToggle={toggleReminder} />
               <View style={styles.divider} />
-              <SettingsItem icon="check-circle" title="Payment Confirmation" showToggle toggleActive={confirmations} onToggle={() => setConfirmations(!confirmations)} />
+              <SettingsItem icon="check-circle" title="Payment Confirmation" showToggle toggleActive={confirmations} onToggle={toggleConfirmation} />
               <View style={styles.divider} />
-              <SettingsItem icon="mail" title="Newsletter" showToggle toggleActive={newsletter} onToggle={() => setNewsletter(!newsletter)} />
+              <SettingsItem icon="mail" title="Newsletter" showToggle toggleActive={newsletter} onToggle={toggleNewsletter} />
             </View>
           </View>
 
@@ -144,13 +199,11 @@ export const SettingsScreen = () => {
           <View style={styles.sectionBlock}>
             <Text style={styles.sectionHeader}>SECURITY</Text>
             <View style={styles.listContainerDk}>
-              <SettingsItem icon="fingerprint" title="Biometric Login" showToggle toggleActive={biometrics} onToggle={() => setBiometrics(!biometrics)} />
+              <SettingsItem icon="face" title="WhatsApp Notification" showToggle toggleActive={whatsapp} onToggle={toggleWhatsapp} />
               <View style={styles.divider} />
-              <SettingsItem icon="face" title="WhatsApp Notification" showToggle toggleActive={whatsapp} onToggle={() => setWhatsapp(!whatsapp)} />
+              <SettingsItem icon="lock" title="Change Password" onPress={() => (navigation as any).navigate('Security')} />
               <View style={styles.divider} />
-              <SettingsItem icon="lock" title="Change Password" />
-              <View style={styles.divider} />
-              <SettingsItem icon="verified-user" title="Two-Factor Auth" />
+              <SettingsItem icon="verified-user" title="Two-Factor Auth" onPress={() => (navigation as any).navigate('Security')} />
             </View>
           </View>
 

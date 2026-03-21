@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Platform, LayoutAnimation, UIManager, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -54,8 +55,12 @@ const INITIAL_NOTIFICATIONS = [
   }
 ];
 
-const NotificationItem = ({ item, onDelete }: any) => (
-  <View style={[styles.notifItem, item.isNew ? styles.notifItemNew : null]}>
+const NotificationItem = ({ item, onDelete, onRead }: any) => (
+  <TouchableOpacity 
+    style={[styles.notifItem, item.isNew ? styles.notifItemNew : null]}
+    activeOpacity={0.8}
+    onPress={() => item.isNew && onRead && onRead(item.id)}
+  >
     <View style={[styles.notifIconBox, { backgroundColor: `${item.color}1A` }]}>
       <MaterialIcons name={item.icon} size={20} color={item.color} />
       {item.isNew && <View style={styles.newBadge} />}
@@ -68,16 +73,41 @@ const NotificationItem = ({ item, onDelete }: any) => (
     <TouchableOpacity onPress={() => onDelete(item.id)} style={styles.deleteBtn}>
       <MaterialIcons name="close" size={16} color={colors.textSecondary} />
     </TouchableOpacity>
-  </View>
+  </TouchableOpacity>
 );
 
 export const NotificationScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
 
+  useEffect(() => {
+    const loadNotifs = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('notifications_state');
+        if (stored) {
+          setNotifications(JSON.parse(stored));
+        }
+      } catch (err) {}
+    };
+    loadNotifs();
+  }, []);
+
+  const persistNotifs = async (newNotifs: any[]) => {
+    setNotifications(newNotifs);
+    try {
+      await AsyncStorage.setItem('notifications_state', JSON.stringify(newNotifs));
+    } catch (err) {}
+  };
+
+  const handleRead = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const updated = notifications.map(n => n.id === id ? { ...n, isNew: false } : n);
+    persistNotifs(updated);
+  };
+
   const handleDelete = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    persistNotifs(notifications.filter(n => n.id !== id));
   };
 
   const handleClearAll = () => {
@@ -91,7 +121,7 @@ export const NotificationScreen = () => {
           style: "destructive", 
           onPress: () => {
             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setNotifications([]);
+            persistNotifs([]);
           } 
         }
       ]
@@ -128,14 +158,14 @@ export const NotificationScreen = () => {
               {todayNotifs.length > 0 && (
                 <>
                   <Text style={styles.sectionTitle}>Today</Text>
-                  {todayNotifs.map(n => <NotificationItem key={n.id} item={n} onDelete={handleDelete} />)}
+                  {todayNotifs.map(n => <NotificationItem key={n.id} item={n} onDelete={handleDelete} onRead={handleRead} />)}
                 </>
               )}
 
               {earlierNotifs.length > 0 && (
                 <>
                   <Text style={[styles.sectionTitle, { marginTop: todayNotifs.length > 0 ? 24 : 0 }]}>Earlier this week</Text>
-                  {earlierNotifs.map(n => <NotificationItem key={n.id} item={n} onDelete={handleDelete} />)}
+                  {earlierNotifs.map(n => <NotificationItem key={n.id} item={n} onDelete={handleDelete} onRead={handleRead} />)}
                 </>
               )}
             </>

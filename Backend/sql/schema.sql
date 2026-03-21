@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS students (
   user_id            UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   college_id         UUID NOT NULL REFERENCES colleges(id) ON DELETE CASCADE,
   college_id_number  TEXT NOT NULL,                  -- e.g. "GIET2024001"
+  registration_number TEXT,                          -- e.g. "2024CSE001"
   course_type        TEXT,                           -- e.g. "B.Tech", "M.Tech"
   stream             TEXT,                           -- e.g. "CSE", "ECE"
   year               INTEGER,                       -- 1–4

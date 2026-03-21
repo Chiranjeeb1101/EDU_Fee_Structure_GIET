@@ -8,12 +8,9 @@ import { Platform } from 'react-native';
 // For physical devices via Expo tunnel, use your machine's LAN IP or ngrok URL
 const getBaseUrl = () => {
   if (__DEV__) {
-    if (Platform.OS === 'android') {
-      return 'http://10.0.2.2:5000/api';
-    }
-    // For iOS simulator / web / physical device via tunnel
-    // Replace with your machine's LAN IP if testing on physical device
-    return 'http://localhost:5000/api';
+    // Using your machine's local IP network address instead of localhost/10.0.2.2
+    // so that physical devices running Expo Go can reach the backend over Wi-Fi.
+    return 'http://10.225.103.101:5000/api';
   }
   // Production URL (update when deployed)
   return 'https://your-production-api.com/api';

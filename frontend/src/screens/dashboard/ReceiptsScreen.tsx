@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Tex
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
+import studentService, { PaymentHistoryItem } from '../../services/studentService';
+import { ActivityIndicator, Alert, Linking } from 'react-native';
+import api from '../../services/api';
 
 const ReceiptCard = ({ title, date, amount, icon, colorHex }: any) => (
   <TouchableOpacity style={styles.receiptCard} activeOpacity={0.8}>
@@ -29,22 +32,44 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const MOCK_RECEIPTS = [
-  { id: '1', title: "Tuition Fee - Sem 4", date: "Oct 24, 2023", amount: "12,500", icon: "school", colorHex: "#60A5FA" },
-  { id: '2', title: "Hostel Fee - Q3", date: "Sep 12, 2023", amount: "8,400", icon: "apartment", colorHex: "#A78BFA" },
-  { id: '3', title: "Mess Charges - Aug", date: "Aug 05, 2023", amount: "4,200", icon: "restaurant", colorHex: "#22D3EE" },
-  { id: '4', title: "Transport - Annual", date: "Jul 20, 2023", amount: "15,000", icon: "directions-bus", colorHex: "#60A5FA" }
-];
-
 export const ReceiptsScreen = () => {
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [receipts, setReceipts] = useState<PaymentHistoryItem[]>([]);
+
+  React.useEffect(() => {
+    fetchReceipts();
+  }, []);
+
+  const fetchReceipts = async () => {
+    try {
+      const data = await studentService.getPaymentHistory();
+      // Only successfully captured payments have receipts
+      setReceipts(data.filter(p => p.status === 'captured' || p.status === 'success'));
+    } catch (error) {
+      console.error('Receipts fetch failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredReceipts = useMemo(() => {
-    return MOCK_RECEIPTS.filter(r => 
-      r.title.toLowerCase().includes(searchQuery.toLowerCase())
+    return receipts.filter(r => 
+      r.razorpay_order_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.id.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [searchQuery, receipts]);
+
+  const handleDownload = async (receiptId: string) => {
+    try {
+      const url = `${api.defaults.baseURL}/payments/${receiptId}/receipt`;
+      // Open in browser to download PDF
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to open receipt download link.');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -88,20 +113,22 @@ export const ReceiptsScreen = () => {
             </View>
           </View>
 
-          {/* Items */}
           <View style={styles.listContainer}>
-            {filteredReceipts.length === 0 ? (
-              <Text style={{ color: 'rgba(148, 163, 184, 0.6)', textAlign: 'center', marginTop: 20 }}>No receipts found.</Text>
+            {loading ? (
+              <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+            ) : filteredReceipts.length === 0 ? (
+              <Text style={{ color: 'rgba(148, 163, 184, 0.6)', textAlign: 'center', marginTop: 40 }}>{searchQuery ? 'No matching receipts.' : 'No digital receipts available yet.'}</Text>
             ) : (
               filteredReceipts.map(r => (
-                <ReceiptCard 
-                  key={r.id} 
-                  title={r.title} 
-                  date={r.date} 
-                  amount={r.amount} 
-                  icon={r.icon} 
-                  colorHex={r.colorHex} 
-                />
+                <TouchableOpacity key={r.id} onPress={() => handleDownload(r.id)} activeOpacity={0.8}>
+                   <ReceiptCard 
+                    title={r.razorpay_order_id ? `Receipt: ${r.razorpay_order_id.substring(0, 10)}...` : 'Institutional Receipt'}
+                    date={new Date(r.created_at).toLocaleDateString()} 
+                    amount={r.amount.toLocaleString()} 
+                    icon="receipt" 
+                    colorHex="#60A5FA" 
+                  />
+                </TouchableOpacity>
               ))
             )}
           </View>

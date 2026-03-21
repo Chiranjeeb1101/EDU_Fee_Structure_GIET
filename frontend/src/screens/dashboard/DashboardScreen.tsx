@@ -1,15 +1,22 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Dimensions, Platform } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Dimensions, LayoutAnimation, Platform, Modal, Pressable, Image } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../App';
 import { colors } from '../../theme/colors';
 import { GlowingBackground } from '../../components/layout/GlowingBackground';
+import { useAuth } from '../../context/AuthContext';
+import studentService, { DashboardData } from '../../services/studentService';
+import { MaterialIcons } from '@expo/vector-icons';
+import { UIManager } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
-const QuickAction = ({ icon, label, subLabel, color, onPress }: { icon: keyof typeof MaterialIcons.glyphMap, label: string, subLabel: string, color: string, onPress: () => void }) => (
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const QuickAction = ({ icon, label, subLabel, color, onPress }: { icon: any, label: string, subLabel: string, color: string, onPress: () => void }) => (
   <TouchableOpacity style={[styles.actionCard, { borderLeftColor: color }]} onPress={onPress}>
     <View style={[styles.actionIconBg, { backgroundColor: `${color}1A` }]}>
       <MaterialIcons name={icon} size={24} color={color} />
@@ -40,6 +47,58 @@ const DeadlineTask = ({ dateNum, dateMonth, title, subtitle, amount, timeLabel, 
 
 export const DashboardScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
+  
+  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+
+  // Fee Toggle State
+  const [showPending, setShowPending] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const autoRevertTimer = React.useRef<any>(null);
+
+  const handleToggleFeeView = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const newVal = !showPending;
+    setShowPending(newVal);
+
+    if (autoRevertTimer.current) clearTimeout(autoRevertTimer.current);
+
+    if (newVal) {
+      autoRevertTimer.current = setTimeout(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setShowPending(false);
+      }, 5000);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  const fetchDashboard = async () => {
+    try {
+      const data = await studentService.getDashboardData();
+      setDashboardData(data);
+    } catch (error) {
+      console.error('Dashboard fetch failed:', error);
+      Alert.alert('Error', 'Failed to sync dashboard data with server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.textSecondary, marginTop: 15 }}>Syncing with campus server...</Text>
+      </View>
+    );
+  }
+
+  const feeStatus = dashboardData?.fee_status || { total_fee: 0, paid_fee: 0, remaining_fee: 0 };
+  const progressPercent = feeStatus.total_fee > 0 ? Math.round((feeStatus.paid_fee / feeStatus.total_fee) * 100) : 0;
 
   return (
     <View style={styles.container}>
@@ -61,9 +120,9 @@ export const DashboardScreen = () => {
                 style={styles.profileBadge}
                 onPress={() => navigation.navigate('Profile')}
               >
-                <Text style={styles.profileName}>Alex</Text>
+                 <Text style={styles.profileName}>{user?.full_name?.split(' ')[0] || 'Student'}</Text>
                 <Image 
-                  source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBMe6_91oLoeN243c8bK58RQU7-i4a7SQ1kaBILzLHQRMEPGIHLn_jMwJ5hRGtUrzj99fKhh6ReA78MsjTreR0iJmwpqBiKXVuYW6ZV_CDRp52TO9UrVuqEKFfqKgXRvgIUqVWcLjX_8E8VzSpKNxeyo88I6AMuTTPOa1mPFFLFLGq4PKhVVyhLpaPxPffWSgqIRt3CyQinLQWqe1fIg5CG5XMPoeQvaOIWx97AtFzLKamFywaAUT11_Ur2pido-qGJHdc_CsGpPAg' }} 
+                  source={{ uri: user?.profile_picture || 'https://lh3.googleusercontent.com/aida-public/AB6AXuBMe6_91oLoeN243c8bK58RQU7-i4a7SQ1kaBILzLHQRMEPGIHLn_jMwJ5hRGtUrzj99fKhh6ReA78MsjTreR0iJmwpqBiKXVuYW6ZV_CDRp52TO3UrVuqEKFfqKgXRvgIUqVWcLjX_8E8VzSpKNxeyo88I6AMuTTPOa1mPFFLFLGq4PKhVVyhLpaPxPffWSgqIRt3CyQinLQWqe1fIg5CG5XMPoeQvaOIWx97AtFzLKamFywaAUT11_Ur2pido-qGJHdc_CsGpPAg' }} 
                   style={styles.profileImage} 
                 />
               </TouchableOpacity>
@@ -76,34 +135,42 @@ export const DashboardScreen = () => {
             <View style={styles.featuredCardWrapper}>
               <View style={styles.featuredGlow} />
               <View style={styles.featuredCard}>
-                <View style={styles.feeTop}>
+                <TouchableOpacity activeOpacity={0.9} style={styles.feeTop} onPress={handleToggleFeeView}>
                   <View>
-                    <Text style={styles.feeTitle}>TOTAL DUE</Text>
-                    <Text style={styles.feeAmount}>₹140,000</Text>
+                    <Text style={[styles.feeTitle, showPending && { color: colors.error }]}>
+                      {showPending ? 'PENDING DUE' : 'TOTAL DUE'}
+                    </Text>
+                    <Text style={[styles.feeAmount, showPending && { color: colors.error }]}>
+                      ₹{showPending ? feeStatus.remaining_fee.toLocaleString() : feeStatus.total_fee.toLocaleString()}
+                    </Text>
                     <View style={styles.feeToggleHint}>
-                      <MaterialIcons name="touch-app" size={10} color={colors.primary} style={{ opacity: 0.6 }} />
-                      <Text style={styles.feeToggleText}>Tap to toggle view</Text>
+                      <MaterialIcons name="touch-app" size={12} color={showPending ? colors.error : colors.primary} style={{ opacity: 0.8 }} />
+                      <Text style={[styles.feeToggleText, showPending && { color: colors.error }]}>Tap to toggle view</Text>
                     </View>
                   </View>
                   <TouchableOpacity style={styles.payBtn}>
                     <Text style={styles.payBtnText}>Pay Now</Text>
                   </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
 
                 {/* Academic Progress */}
-                <View style={styles.progressContainer}>
+                <TouchableOpacity 
+                  style={styles.progressContainer} 
+                  onPress={() => setShowProgressModal(true)}
+                  activeOpacity={0.8}
+                >
                   <View style={styles.progressTop}>
-                    <Text style={styles.progressLabel}>ACADEMIC YEAR PROGRESS</Text>
-                    <Text style={styles.progressValue}>65% Complete</Text>
+                    <Text style={styles.progressLabel}>FEE SETTLEMENT PROGRESS</Text>
+                    <Text style={styles.progressValue}>{progressPercent}% Settled</Text>
                   </View>
                   <View style={styles.progressBarBg}>
-                    <View style={[styles.progressBarFill, { width: '65%' }]} />
+                    <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
                   </View>
                   <View style={styles.progressBottom}>
-                    <Text style={styles.progressDate}>Aug 2023</Text>
-                    <Text style={styles.progressDate}>May 2024</Text>
+                    <Text style={styles.progressDate}>Entry Base</Text>
+                    <Text style={styles.progressDate}>Cleared</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
                 {/* 3D Decor Blob */}
                 <View style={styles.decorBlob} />
               </View>
@@ -168,6 +235,53 @@ export const DashboardScreen = () => {
             </View>
 
           </ScrollView>
+
+          {/* Fee Breakdown Modal */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={showProgressModal}
+            onRequestClose={() => setShowProgressModal(false)}
+          >
+            <Pressable 
+              style={styles.modalOverlay} 
+              onPress={() => setShowProgressModal(false)}
+            >
+              <View style={styles.modalContent}>
+                <View style={styles.modalIndicator} />
+                <Text style={styles.modalTitle}>Settlement Details</Text>
+                
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Total Fee</Text>
+                  <Text style={styles.detailValue}>₹{feeStatus.total_fee.toLocaleString()}</Text>
+                </View>
+                
+                <View style={[styles.detailRow, { backgroundColor: 'rgba(34, 197, 94, 0.05)' }]}>
+                  <Text style={[styles.detailLabel, { color: colors.success }]}>Paid Amount</Text>
+                  <Text style={[styles.detailValue, { color: colors.success }]}>₹{feeStatus.paid_fee.toLocaleString()}</Text>
+                </View>
+
+                <View style={[styles.detailRow, { backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>
+                  <Text style={[styles.detailLabel, { color: colors.error }]}>Remaining Due</Text>
+                  <Text style={[styles.detailValue, { color: colors.error }]}>₹{feeStatus.remaining_fee.toLocaleString()}</Text>
+                </View>
+
+                <View style={styles.modalProgressSection}>
+                  <View style={styles.modalProgressBarBg}>
+                    <View style={[styles.modalProgressBarFill, { width: `${progressPercent}%` }]} />
+                  </View>
+                  <Text style={styles.modalProgressText}>{progressPercent}% of your total fee is settled.</Text>
+                </View>
+
+                <TouchableOpacity 
+                  style={styles.closeBtn} 
+                  onPress={() => setShowProgressModal(false)}
+                >
+                  <Text style={styles.closeBtnText}>CLOSE BREAKDOWN</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Modal>
 
         </SafeAreaView>
       </GlowingBackground>
@@ -253,11 +367,13 @@ const styles = StyleSheet.create({
   },
   featuredGlow: {
     position: 'absolute',
-    inset: -4,
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
     backgroundColor: colors.primary,
     opacity: 0.2,
     borderRadius: 36,
-    filter: 'blur(20px)', // doesn't work exact in RN, simulating with absolute overlay
   },
   featuredCard: {
     backgroundColor: 'rgba(30,37,59,0.4)',
@@ -299,7 +415,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   payBtn: {
-    backgroundColor: colors.primary, // should be gradient but fallback to solid primary
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 20,
@@ -545,18 +661,92 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  facePlusText: {
+  facePlusText: { color: colors.white, fontSize: 10, fontWeight: '700' },
+  insightBlob: { position: 'absolute', bottom: -20, right: -20, width: 60, height: 60, borderRadius: 30, backgroundColor: colors.tertiary, opacity: 0.1 },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#161b2e',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 30,
+    paddingTop: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  modalIndicator: {
+    width: 40,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 25,
+  },
+  modalTitle: {
     color: colors.white,
-    fontSize: 8,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  detailLabel: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  detailValue: {
+    color: colors.white,
+    fontSize: 16,
     fontWeight: '800',
   },
-  insightBlob: {
-    position: 'absolute',
-    bottom: -40,
-    right: -40,
-    width: 100,
-    height: 100,
-    backgroundColor: 'rgba(144, 171, 255, 0.2)',
-    borderRadius: 50,
+  modalProgressSection: {
+    marginTop: 10,
+    marginBottom: 25,
+    alignItems: 'center',
+  },
+  modalProgressBarBg: {
+    width: '100%',
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 4,
+    marginBottom: 12,
+  },
+  modalProgressBarFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 4,
+  },
+  modalProgressText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  closeBtn: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 16,
+    borderRadius: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  closeBtnText: {
+    color: colors.white,
+    fontWeight: '800',
+    fontSize: 12,
+    letterSpacing: 1.5,
   },
 });

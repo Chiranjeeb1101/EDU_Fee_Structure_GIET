@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import authService, { UserData } from '../services/authService';
 
 // ─── Types ──────────────────────────────────────────────────────
@@ -59,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Save credentials if "Remember Me" is checked
       if (remember) {
-        await authService.saveCredentials(collegeId, password);
+        await authService.saveCredentials(collegeId, password, response.data.user.role);
       } else {
         await authService.clearSavedCredentials();
       }
@@ -85,6 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const result = await authService.updateProfile(payload);
       if (result.success) {
         setUser(result.user);
+        await AsyncStorage.setItem('user_data', JSON.stringify(result.user));
         return { success: true, message: 'Profile updated successfully' };
       }
       return { success: false, message: result.message || 'Update failed' };

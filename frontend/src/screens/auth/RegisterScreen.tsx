@@ -27,6 +27,7 @@ export const RegisterScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [regNumber, setRegNumber] = useState('');
+  const [registrationNumber, setRegistrationNumber] = useState(''); // New field
   const [studentPhone, setStudentPhone] = useState('');
   const [parentName, setParentName] = useState('');
   const [parentWhatsapp, setParentWhatsapp] = useState('');
@@ -49,15 +50,100 @@ export const RegisterScreen = () => {
     }
   };
 
+  // Password strength calculation
+  const getPasswordStrength = (pwd: string) => {
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[a-z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) score++;
+    return score; // 0-5
+  };
+
+  const strengthLabels = ['', 'Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
+  const strengthColors = ['transparent', '#ef4444', '#f97316', '#eab308', '#22c55e', '#10b981'];
+  const passwordStrength = getPasswordStrength(password);
+
   const validate = () => {
-    if (!fullName || !email || !password || !regNumber) {
-      setErrorMsg('Name, Email, Password, and Registration Number are required.');
+    // Name
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      setErrorMsg('Full name is required and must be at least 2 characters.');
       return false;
     }
-    if (password.length < 6) {
-      setErrorMsg('Password must be at least 6 characters.');
+
+    // Email format
+    if (!email.trim()) {
+      setErrorMsg('Email address is required.');
       return false;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setErrorMsg('Please enter a valid email address (e.g., name@domain.com).');
+      return false;
+    }
+    // Block disposable/demo email domains
+    const blockedDomains = ['test.com', 'example.com', 'demo.com', 'fake.com', 'temp.com', 'mailinator.com', 'guerrillamail.com', 'yopmail.com', 'sharklasers.com', 'trashmail.com'];
+    const emailDomain = email.trim().split('@')[1]?.toLowerCase();
+    if (blockedDomains.includes(emailDomain)) {
+      setErrorMsg('Disposable or demo email addresses are not allowed. Please use a real email.');
+      return false;
+    }
+
+    // Registration Number
+    if (!regNumber.trim()) {
+      setErrorMsg('Registration / College ID Number is required.');
+      return false;
+    }
+    const cleanRegNumber = regNumber.trim().toUpperCase();
+    const idRegex = /^[A-Z0-9]+$/;
+    if (!idRegex.test(cleanRegNumber) || cleanRegNumber.length < 5 || cleanRegNumber.length > 20) {
+      setErrorMsg('College ID must be 5-20 alphanumeric characters without spaces or special characters.');
+      return false;
+    }
+
+    // Password: must be at least 8 chars, 1 upper, 1 lower, 1 digit, 1 special
+    if (!password) {
+      setErrorMsg('Password is required.');
+      return false;
+    }
+    if (password.length < 8) {
+      setErrorMsg('Password must be at least 8 characters long.');
+      return false;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setErrorMsg('Password must contain at least one uppercase letter (A-Z).');
+      return false;
+    }
+    if (!/[a-z]/.test(password)) {
+      setErrorMsg('Password must contain at least one lowercase letter (a-z).');
+      return false;
+    }
+    if (!/[0-9]/.test(password)) {
+      setErrorMsg('Password must contain at least one number (0-9).');
+      return false;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      setErrorMsg('Password must contain at least one special character (!@#$%^&*...).');
+      return false;
+    }
+
+    // Phone Number Validation (10 digits)
+    if (studentPhone) {
+      const cleanPhone = studentPhone.replace(/\D/g, '');
+      if (cleanPhone.length !== 10) {
+        setErrorMsg('Student phone number must be exactly 10 digits.');
+        return false;
+      }
+    }
+    if (parentWhatsapp) {
+      const cleanWhatsapp = parentWhatsapp.replace(/\D/g, '');
+      if (cleanWhatsapp.length !== 10) {
+        setErrorMsg('Parent WhatsApp number must be exactly 10 digits.');
+        return false;
+      }
+    }
+
     setErrorMsg('');
     return true;
   };
@@ -71,7 +157,8 @@ export const RegisterScreen = () => {
         full_name: fullName.trim(),
         personal_email: email.trim(),
         password,
-        college_id_number: regNumber.trim(),
+        college_id_number: regNumber.trim().toUpperCase(),
+        registration_number: registrationNumber.trim().toUpperCase() || undefined,
         profile_picture: profileImageBase64 || undefined,
         course_type: course,
         stream: branch,
@@ -84,7 +171,10 @@ export const RegisterScreen = () => {
 
       const result = await authService.register(payload);
       if (result.success) {
-        navigation.navigate('RegistrationSuccess');
+        navigation.navigate('RegistrationSuccess', { 
+          user: result.data.user,
+          student: result.data.student 
+        });
       } else {
         setErrorMsg(result.message);
       }
@@ -174,13 +264,36 @@ export const RegisterScreen = () => {
                 </View>
 
                 <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>REGISTRATION NUMBER (OPTIONAL)</Text>
+                  <TextInput style={styles.input} placeholder="e.g. 2024CSE101" placeholderTextColor="rgba(255,255,255,0.3)" autoCapitalize="characters" value={registrationNumber} onChangeText={setRegistrationNumber} editable={!isLoading} />
+                </View>
+
+                <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>SECURE PASSWORD</Text>
                   <View style={styles.passwordWrapper}>
-                    <TextInput style={[styles.input, { paddingRight: 48 }]} placeholder="••••••••••••" placeholderTextColor="rgba(255,255,255,0.3)" secureTextEntry={!isPasswordVisible} value={password} onChangeText={setPassword} editable={!isLoading} />
+                    <TextInput style={[styles.input, { paddingRight: 48 }]} placeholder="Min 8 chars, A-z, 0-9, !@#" placeholderTextColor="rgba(255,255,255,0.3)" secureTextEntry={!isPasswordVisible} value={password} onChangeText={setPassword} editable={!isLoading} />
                     <TouchableOpacity style={styles.visibilityToggle} onPress={() => setPasswordVisible(!isPasswordVisible)}>
                       <MaterialIcons name={isPasswordVisible ? 'visibility' : 'visibility-off'} size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
+                  {/* Password Strength Meter */}
+                  {password.length > 0 && (
+                    <View style={styles.strengthContainer}>
+                      <View style={styles.strengthBarTrack}>
+                        <View style={[styles.strengthBarFill, { width: `${(passwordStrength / 5) * 100}%`, backgroundColor: strengthColors[passwordStrength] }]} />
+                      </View>
+                      <Text style={[styles.strengthLabel, { color: strengthColors[passwordStrength] }]}>{strengthLabels[passwordStrength]}</Text>
+                    </View>
+                  )}
+                  {password.length > 0 && passwordStrength < 5 && (
+                    <View style={styles.strengthHints}>
+                      {password.length < 8 && <Text style={styles.hintText}>• Min 8 characters</Text>}
+                      {!/[A-Z]/.test(password) && <Text style={styles.hintText}>• One uppercase letter</Text>}
+                      {!/[a-z]/.test(password) && <Text style={styles.hintText}>• One lowercase letter</Text>}
+                      {!/[0-9]/.test(password) && <Text style={styles.hintText}>• One number</Text>}
+                      {!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) && <Text style={styles.hintText}>• One special character</Text>}
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -250,8 +363,8 @@ export const RegisterScreen = () => {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>STUDENT PHONE</Text>
-                  <TextInput style={styles.input} placeholder="+1 (555) 000-0000" placeholderTextColor="rgba(255,255,255,0.3)" keyboardType="phone-pad" value={studentPhone} onChangeText={setStudentPhone} editable={!isLoading} />
+                  <Text style={styles.inputLabel}>STUDENT PHONE (10 DIGITS)</Text>
+                  <TextInput style={styles.input} placeholder="e.g. 9876543210" placeholderTextColor="rgba(255,255,255,0.3)" keyboardType="phone-pad" maxLength={10} value={studentPhone} onChangeText={(text) => setStudentPhone(text.replace(/\D/g, ''))} editable={!isLoading} />
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -265,11 +378,12 @@ export const RegisterScreen = () => {
                     <MaterialIcons name="chat" size={20} color="#34D399" style={styles.whatsappIcon} />
                     <TextInput 
                       style={[styles.input, styles.whatsappInput]} 
-                      placeholder="+1 (555) WhatsApp" 
+                      placeholder="e.g. 9876543210" 
                       placeholderTextColor="rgba(255,255,255,0.3)" 
                       keyboardType="phone-pad" 
+                      maxLength={10}
                       value={parentWhatsapp}
-                      onChangeText={setParentWhatsapp}
+                      onChangeText={(text) => setParentWhatsapp(text.replace(/\D/g, ''))}
                       editable={!isLoading}
                     />
                   </View>
@@ -685,5 +799,38 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: '600',
+  },
+  strengthContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 10,
+  },
+  strengthBarTrack: {
+    flex: 1,
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  strengthBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  strengthLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    minWidth: 70,
+    textAlign: 'right',
+  },
+  strengthHints: {
+    marginTop: 8,
+    gap: 2,
+  },
+  hintText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '500',
   },
 });

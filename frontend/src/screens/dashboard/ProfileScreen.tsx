@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Platform, Alert, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ProfileListItem = ({ icon, title, subtitle, colorClass, showToggle, toggleActive, onPress }: any) => (
   <TouchableOpacity style={styles.listItem} activeOpacity={0.8} onPress={onPress}>
@@ -36,11 +38,68 @@ export const ProfileScreen = () => {
   const [pushNotif, setPushNotif] = useState(true);
   const [emailAlerts, setEmailAlerts] = useState(false);
 
+  // Load persistence
+  React.useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const saved = await AsyncStorage.getItem('user_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setPushNotif(parsed.pushNotif ?? true);
+          setEmailAlerts(parsed.emailAlerts ?? false);
+        }
+      } catch (e) {
+        console.warn('Failed to load settings', e);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  // Save persistence helper
+  const saveSetting = async (key: string, value: boolean) => {
+    try {
+      const current = await AsyncStorage.getItem('user_settings');
+      const settings = current ? JSON.parse(current) : {};
+      settings[key] = value;
+      await AsyncStorage.setItem('user_settings', JSON.stringify(settings));
+    } catch (e) {
+      console.error('Failed to save setting', e);
+    }
+  };
+
+  const togglePushNotif = () => {
+    const newVal = !pushNotif;
+    setPushNotif(newVal);
+    saveSetting('pushNotif', newVal);
+  };
+
+  const toggleEmailAlerts = () => {
+    const newVal = !emailAlerts;
+    setEmailAlerts(newVal);
+    saveSetting('emailAlerts', newVal);
+  };
+
   // Edit Modal States
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState(user?.full_name || '');
   const [editEmail, setEditEmail] = useState(user?.personal_email || user?.email || '');
   const [editPhone, setEditPhone] = useState(user?.student_phone || '');
+  const [editImage, setEditImage] = useState<string | null>(null);
+  const [editImageBase64, setEditImageBase64] = useState<string | null>(null);
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled) {
+      setEditImage(result.assets[0].uri);
+      setEditImageBase64(result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : null);
+    }
+  };
 
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
@@ -53,11 +112,14 @@ export const ProfileScreen = () => {
       const result = await updateUser({
         full_name: editName,
         personal_email: editEmail,
-        student_phone: editPhone
+        student_phone: editPhone,
+        profile_picture: editImageBase64 || undefined
       });
 
       if (result.success) {
         setEditModalVisible(false);
+        setEditImage(null);
+        setEditImageBase64(null);
         Alert.alert("Success", "Profile updated successfully!");
       } else {
         Alert.alert("Error", result.message);
@@ -107,18 +169,18 @@ export const ProfileScreen = () => {
           
           {/* Profile Header */}
           <View style={styles.profileSection}>
-            <View style={styles.avatarWrapper}>
+            <TouchableOpacity style={styles.avatarWrapper} onPress={pickImage}>
               <View style={styles.avatarGlow} />
               <View style={styles.avatarBorder}>
                 <Image 
-                  source={{ uri: user?.profile_picture || 'https://lh3.googleusercontent.com/aida-public/AB6AXuAP7c6BKhlg06MLobhj0M2A7aFjdsRXxVarCJoKlNsWM69F4glA_7JmXiOr86Is6g70T3DWr2XUvQK5JF0gMKLqTnC8UpACxoqSMF57ee8uFohF0juMeRgX5Vs_R0ASSMl9VdiWbL31t2Di2XVUIdLX2gm7x30ykuZQmjZS195IF9VBecZyLR8d_UXVknhN0CLwIvBdnTHwzjGeCau0dcM5XqEimb3wzc9S_kX6BDbc3PIdy48DR3qsjv8m5o1O8hd00g9LI8mOWJw' }} 
+                  source={{ uri: editImage || user?.profile_picture || 'https://lh3.googleusercontent.com/aida-public/AB6AXuAP7c6BKhlg06MLobhj0M2A7aFjdsRXxVarCJoKlNsWM69F4glA_7JmXiOr86Is6g70T3DWr2XUvQK5JF0gMKLqTnC8UpACxoqSMF57ee8uFohF0juMeRgX5Vs_R0ASSMl9VdiWbL31t2Di2XVUIdLX2gm7x30ykuZQmjZS195IF9VBecZyLR8d_UXVknhN0CLwIvBdnTHwzjGeCau0dcM5XqEimb3wzc9S_kX6BDbc3PIdy48DR3qsjv8m5o1O8hd00g9LI8mOWJw' }} 
                   style={styles.avatarImg} 
                 />
               </View>
               <View style={styles.editBadge}>
-                <MaterialIcons name="edit" size={16} color={colors.white} />
+                <MaterialIcons name="camera-alt" size={16} color={colors.white} />
               </View>
-            </View>
+            </TouchableOpacity>
             <Text style={styles.profileName}>{user?.full_name || 'Alex Rivera'}</Text>
             <Text style={styles.profileId}>Registration ID: {user?.college_id_number || '2026-XXXX-XXXX'}</Text>
           </View>
@@ -133,10 +195,18 @@ export const ProfileScreen = () => {
               onPress={() => setEditModalVisible(true)}
             />
             <ProfileListItem 
+              icon="badge" 
+              title="Digital Identity Card" 
+              subtitle="View your verified student ID"
+              colorClass="rgba(71, 196, 255, 0.1)" // tertiary dim
+              onPress={() => (navigation as any).navigate('DigitalIdentityCard')}
+            />
+            <ProfileListItem 
               icon="payments" 
               title="Manage Payments" 
               subtitle="Saved cards, UPI IDs, limits"
               colorClass="rgba(175, 136, 255, 0.1)" // secondary dim
+              onPress={() => (navigation as any).navigate('PaymentMethods')}
             />
             
             <Text style={styles.sectionLabel}>PREFERENCES & SECURITY</Text>
@@ -151,14 +221,35 @@ export const ProfileScreen = () => {
                   <Text style={styles.liSubtitle}>Alerts and preference sync</Text>
                 </View>
               </View>
+              <View style={styles.infoRow}>
+              <View style={styles.infoIconBg}>
+                <MaterialIcons name="badge" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={styles.infoLabel}>COLLEGE ID</Text>
+                <Text style={styles.infoValue}>{user?.college_id_number || 'Not Set'}</Text>
+              </View>
+            </View>
+
+            {user?.registration_number && (
+              <View style={styles.infoRow}>
+                <View style={styles.infoIconBg}>
+                  <MaterialIcons name="assignment-ind" size={18} color={colors.primary} />
+                </View>
+                <View style={styles.infoTextContainer}>
+                  <Text style={styles.infoLabel}>REGISTRATION NO</Text>
+                  <Text style={styles.infoValue}>{user.registration_number}</Text>
+                </View>
+              </View>
+            )}
               <View style={styles.nestedContent}>
-                <TouchableOpacity style={styles.nestedRow} onPress={() => setPushNotif(!pushNotif)} activeOpacity={0.8}>
+                <TouchableOpacity style={styles.nestedRow} onPress={togglePushNotif} activeOpacity={0.8}>
                   <Text style={styles.nestedRowText}>Push Notifications</Text>
                   <View style={[styles.toggleBg, pushNotif ? styles.toggleBgActive : styles.toggleBgInactive]}>
                     <View style={[styles.toggleThumb, pushNotif && styles.toggleThumbActive]} />
                   </View>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.nestedRow} onPress={() => setEmailAlerts(!emailAlerts)} activeOpacity={0.8}>
+                <TouchableOpacity style={styles.nestedRow} onPress={toggleEmailAlerts} activeOpacity={0.8}>
                   <Text style={styles.nestedRowText}>Email Alerts</Text>
                   <View style={[styles.toggleBg, emailAlerts ? styles.toggleBgActive : styles.toggleBgInactive]}>
                     <View style={[styles.toggleThumb, emailAlerts && styles.toggleThumbActive]} />
@@ -172,12 +263,14 @@ export const ProfileScreen = () => {
               title="Security" 
               subtitle="Password reset"
               colorClass="rgba(255, 113, 108, 0.1)" // error dim
+              onPress={() => (navigation as any).navigate('Security')}
             />
             <ProfileListItem 
               icon="help" 
               title="Support & Help" 
               subtitle="FAQs, Contact support, Privacy"
               colorClass="rgba(166, 170, 191, 0.1)" // surface variant dim
+              onPress={() => Alert.alert("Support Center", "The support portal is being upgraded. Please contact support@edu-fee.com for immediate help.")}
             />
           </View>
 
@@ -218,9 +311,9 @@ export const ProfileScreen = () => {
               </View>
 
               <TouchableOpacity 
-                style={[styles.saveBtn, isUpdating && { opacity: 0.7 }]} 
+                style={[styles.saveBtn, (isUpdating || !editName.trim()) && { opacity: 0.7 }]} 
                 onPress={handleSaveProfile}
-                disabled={isUpdating}
+                disabled={isUpdating || !editName.trim()}
               >
                 <Text style={styles.saveBtnText}>{isUpdating ? "Saving..." : "Save Changes"}</Text>
               </TouchableOpacity>
@@ -512,5 +605,36 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontWeight: '800',
     fontSize: 14,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    gap: 16,
+  },
+  infoIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  infoLabel: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  infoValue: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

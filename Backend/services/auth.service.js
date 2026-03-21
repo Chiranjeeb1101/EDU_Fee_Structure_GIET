@@ -11,7 +11,8 @@ class AuthService {
     const { 
       full_name, college_id_number, password, college_id,
       personal_email, profile_picture, course_type, stream, 
-      year, accommodation, student_phone, parent_name, parent_whatsapp
+      year, accommodation, student_phone, parent_name, parent_whatsapp,
+      registration_number
     } = data;
     
     // Default to environment college ID if not provided
@@ -65,6 +66,7 @@ class AuthService {
           user_id: newUser.id,
           college_id: targetCollegeId,
           college_id_number,
+          registration_number: registration_number || null,
           course_type: course_type || null,
           stream: stream || null,
           year: year ? parseInt(year.toString().replace(/\D/g, ''), 10) : null, // Extract number from "1st Year" if passed
@@ -91,10 +93,55 @@ class AuthService {
 
   /**
    * Login student using college_id_number + password
+   * Or login admin using email + password
    */
   async login(college_id_number, password, college_id) {
     const targetCollegeId = college_id || process.env.DEFAULT_COLLEGE_ID;
-    
+    const isEmail = college_id_number.includes('@');
+
+    // ── Admin login path (email-based) ──────────────────────────
+    if (isEmail) {
+      // Look up admin user by email
+      const { data: adminUser, error: adminError } = await supabase
+        .from('users')
+        .select('id, email, role, full_name, college_id')
+        .eq('email', college_id_number)
+        .eq('role', 'admin')
+        .single();
+
+      if (adminError || !adminUser) {
+        throw Object.assign(new Error('Invalid college ID number or password.'), { statusCode: 401 });
+      }
+
+      // Authenticate with Supabase Auth
+      const tempClient = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_ANON_KEY,
+        { auth: { persistSession: false, autoRefreshToken: false } }
+      );
+
+      const { data: authData, error: authError } = await tempClient.auth.signInWithPassword({
+        email: adminUser.email,
+        password,
+      });
+
+      if (authError || !authData.session) {
+        throw Object.assign(new Error('Invalid college ID number or password.'), { statusCode: 401 });
+      }
+
+      return {
+        token: authData.session.access_token,
+        user: {
+          full_name: adminUser.full_name,
+          role: adminUser.role,
+          college_id_number: adminUser.email,
+          college_id: adminUser.college_id,
+          profile_complete: true,
+        },
+      };
+    }
+
+    // ── Student login path (college_id_number) ──────────────────
     // 1. Lookup student to ensure they exist and get user_id
     const { data: student, error: studentError } = await supabase
       .from('students')
@@ -119,8 +166,6 @@ class AuthService {
     }
 
     // 3. Authenticate with Supabase Auth using a temporary client
-    // We do NOT use the global admin `supabase` client here, because
-    // `signInWithPassword` would mutate its session globally for all users!
     const tempClient = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY,
@@ -217,7 +262,8 @@ class AuthService {
     const { data, error } = await supabase
       .from('users')
       .select(`
-        id, full_name, email, role, college_id,
+        id, full_name, email, role, college_id, 
+        profile_picture, personal_email, fcm_token,
         students (*)
       `)
       .eq('id', userId)
@@ -288,6 +334,50 @@ class AuthService {
 
     // 3. Return full updated profile
     return this.getProfile(userId);
+  }
+  
+  /**
+   * Change password for the authenticated user
+   */
+  async changePassword(userId, oldPassword, newPassword) {
+    // 1. Get the user email + auth_id from the users table
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('email, auth_id')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      throw Object.assign(new Error('User not found.'), { statusCode: 404 });
+    }
+
+    // 2. Verify old password by attempting a sign-in
+    const tempClient = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY,
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    );
+
+    const { error: signInError } = await tempClient.auth.signInWithPassword({
+      email: user.email,
+      password: oldPassword,
+    });
+
+    if (signInError) {
+      throw Object.assign(new Error('Invalid old password.'), { statusCode: 401 });
+    }
+
+    // 3. Update the password in Supabase Auth using admin client
+    const { error: authError } = await supabase.auth.admin.updateUserById(
+      user.auth_id,
+      { password: newPassword }
+    );
+
+    if (authError) {
+      throw Object.assign(new Error(`Failed to update password: ${authError.message}`), { statusCode: 500 });
+    }
+
+    return true;
   }
 }
 

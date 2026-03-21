@@ -38,17 +38,9 @@ export const LoginScreen = () => {
   // Error shake animation
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  // Load saved credentials on mount
+  // Credentials are now loaded dynamically when a role is selected.
   useEffect(() => {
-    const loadSavedCreds = async () => {
-      const saved = await authService.getSavedCredentials();
-      if (saved) {
-        setIdValue(saved.collegeId);
-        setPasswordValue(saved.password);
-        setRememberMe(true);
-      }
-    };
-    loadSavedCreds();
+    // keeping empty to avoid breaking hooks
   }, []);
 
   const triggerShake = () => {
@@ -63,6 +55,20 @@ export const LoginScreen = () => {
   const handleRoleSelect = (selectedRole: Role) => {
     setRole(selectedRole);
     setErrorMsg('');
+    
+    // Load credentials specific to this role
+    authService.getSavedCredentials().then((saved) => {
+      if (saved && saved.role === selectedRole) {
+        setIdValue(saved.collegeId);
+        setPasswordValue(saved.password);
+        setRememberMe(true);
+      } else {
+        setIdValue('');
+        setPasswordValue('');
+        setRememberMe(false);
+      }
+    });
+
     // Animate Selection Out & Header Shrink
     Animated.parallel([
       Animated.timing(selectionScale, { toValue: 0.95, duration: 400, useNativeDriver: true }),
@@ -128,17 +134,28 @@ export const LoginScreen = () => {
 
     setIsLoading(true);
     try {
-      const result = await login(idValue.trim(), passwordValue, rememberMe);
+      let submitId = idValue.trim();
+      // If student, definitely uppercase. If admin email, lowercasing is safer, though backend does it.
+      if (role === 'student' && !submitId.includes('@')) {
+        submitId = submitId.toUpperCase();
+      } else if (role === 'admin' && submitId.includes('@')) {
+        submitId = submitId.toLowerCase();
+      }
+
+      const result = await login(submitId, passwordValue, rememberMe);
       
       if (result.success) {
-        // Navigate to Dashboard
         if (role === 'student') {
           (navigation as any).reset({
             index: 0,
             routes: [{ name: 'MainTabs', params: { screen: 'Dashboard' } }],
           });
+        } else if (role === 'admin') {
+          (navigation as any).reset({
+            index: 0,
+            routes: [{ name: 'AdminTabs', params: { screen: 'Dashboard' } }],
+          });
         }
-        // Admin flow can be added later
       } else {
         setErrorMsg(result.message);
         triggerShake();

@@ -20,6 +20,7 @@ export interface RegisterPayload {
   student_phone?: string;
   parent_name?: string;
   parent_whatsapp?: string;
+  registration_number?: string;
 }
 
 export interface UserData {
@@ -28,10 +29,15 @@ export interface UserData {
   full_name: string;
   role: 'student' | 'admin';
   college_id_number?: string;
+  registration_number?: string;
   profile_complete?: boolean;
   profile_picture?: string;
   personal_email?: string;
   student_phone?: string;
+  stream?: string;
+  course_type?: string;
+  accommodation?: string;
+  year?: number;
 }
 
 export interface LoginResponse {
@@ -63,8 +69,21 @@ const authService = {
     const { token, user } = response.data.data;
 
     // Persist token and user data
+    const rawUser = response.data.data.user;
+    const mappedUser: UserData = {
+      id: rawUser.id,
+      email: rawUser.email,
+      full_name: rawUser.full_name,
+      role: rawUser.role,
+      college_id_number: rawUser.college_id_number,
+      profile_complete: rawUser.profile_complete,
+      // If login returns more student info, map it here
+      stream: rawUser.stream,
+      course_type: rawUser.course_type,
+    };
+
     await AsyncStorage.setItem('auth_token', token);
-    await AsyncStorage.setItem('user_data', JSON.stringify(user));
+    await AsyncStorage.setItem('user_data', JSON.stringify(mappedUser));
 
     return response.data;
   },
@@ -96,11 +115,11 @@ const authService = {
   /**
    * Remember Me: store/clear credentials locally
    */
-  saveCredentials: async (collegeId: string, password: string) => {
-    await AsyncStorage.setItem('saved_credentials', JSON.stringify({ collegeId, password }));
+  saveCredentials: async (collegeId: string, password: string, role: string) => {
+    await AsyncStorage.setItem('saved_credentials', JSON.stringify({ collegeId, password, role }));
   },
 
-  getSavedCredentials: async (): Promise<{ collegeId: string; password: string } | null> => {
+  getSavedCredentials: async (): Promise<{ collegeId: string; password: string; role?: string } | null> => {
     try {
       const data = await AsyncStorage.getItem('saved_credentials');
       return data ? JSON.parse(data) : null;
@@ -138,23 +157,35 @@ const authService = {
     
     // If update is successful and includes user data, update local storage
     if (response.data.success && response.data.data) {
-      // The backend returns the full profile. We need to map it to UserData format.
-      const rawUser = response.data.data;
-      const updatedUser: UserData = {
-        id: rawUser.id,
-        email: rawUser.email,
-        full_name: rawUser.full_name,
-        role: rawUser.role,
-        college_id_number: rawUser.students?.[0]?.college_id_number,
-        profile_complete: rawUser.students?.[0]?.profile_complete,
-        profile_picture: rawUser.profile_picture,
-        personal_email: rawUser.personal_email,
-        student_phone: rawUser.students?.[0]?.student_phone,
-      };
-      await AsyncStorage.setItem('user_data', JSON.stringify(updatedUser));
-      return { success: true, user: updatedUser };
+      try {
+        // The backend returns the full profile. We need to map it to UserData format.
+        const rawUser = response.data.data;
+        const updatedUser: UserData = {
+          id: rawUser.id,
+          email: rawUser.email,
+          full_name: rawUser.full_name,
+          role: rawUser.role,
+          college_id_number: rawUser.students?.[0]?.college_id_number,
+          profile_complete: rawUser.students?.[0]?.profile_complete,
+          profile_picture: rawUser.profile_picture,
+          personal_email: rawUser.personal_email,
+          student_phone: rawUser.students?.[0]?.student_phone,
+          stream: rawUser.students?.[0]?.stream,
+          course_type: rawUser.students?.[0]?.course_type,
+          accommodation: rawUser.students?.[0]?.accommodation,
+          year: rawUser.students?.[0]?.year,
+        };
+        await AsyncStorage.setItem('user_data', JSON.stringify(updatedUser));
+        return { success: true, user: updatedUser };
+      } catch (error) {
+        console.error('Failed to update local user data:', error);
+      }
     }
-    
+    return response.data;
+  },
+
+  async changePassword(old_password: string, new_password: string) {
+    const response = await api.post('/auth/change-password', { old_password, new_password });
     return response.data;
   },
 };

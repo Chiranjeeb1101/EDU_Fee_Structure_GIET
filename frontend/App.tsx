@@ -17,12 +17,24 @@ import { CalendarScreen } from './src/screens/dashboard/CalendarScreen';
 import { DocumentsScreen } from './src/screens/dashboard/DocumentsScreen';
 import { SettingsScreen } from './src/screens/dashboard/SettingsScreen';
 import { ProfileScreen } from './src/screens/dashboard/ProfileScreen';
+import { IdentityCardScreen } from './src/screens/dashboard/IdentityCardScreen';
+import SecurityScreen from './src/screens/dashboard/SecurityScreen';
+import PaymentMethodsScreen from './src/screens/dashboard/PaymentMethodsScreen';
+import { AdminDashboardScreen } from './src/screens/admin/AdminDashboardScreen';
+import { AdminStudentsScreen } from './src/screens/admin/AdminStudentsScreen';
+import { AdminFeeStructureScreen } from './src/screens/admin/AdminFeeStructureScreen';
+import { AdminPaymentsScreen } from './src/screens/admin/AdminPaymentsScreen';
+import { AdminAnalyticsScreen } from './src/screens/admin/AdminAnalyticsScreen';
+import { AdminStudentDetailScreen } from './src/screens/admin/AdminStudentDetailScreen';
+import { AdminSettingsScreen } from './src/screens/admin/AdminSettingsScreen';
+import { AdminAddStudentScreen } from './src/screens/admin/AdminAddStudentScreen';
+import { AdminNotificationsScreen } from './src/screens/admin/AdminNotificationsScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BottomNav } from './src/components/navigation/BottomNav';
+import { AdminBottomNav } from './src/components/navigation/AdminBottomNav';
 import { PanResponder, View } from 'react-native';
 
-// Global context to track if Navbar should be visible
-export const NavContext = React.createContext({ isNavVisible: true });
+import { NavContext } from './src/context/NavContext';
 
 export type RootStackParamList = {
   Welcome: undefined;
@@ -30,12 +42,25 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   SupportCenter: undefined;
   Register: undefined;
-  RegistrationSuccess: undefined;
+  RegistrationSuccess: { user: any; student: any };
   MainTabs: { screen: string } | undefined;
+  AdminTabs: { screen: string } | undefined;
   Notification: undefined;
   Calendar: undefined;
   Profile: undefined;
-  // Tab screens listed for TS composite navigation inference
+  // Screens for navigation
+  DigitalIdentityCard: undefined;
+  Security: undefined;
+  PaymentMethods: undefined;
+  AdminStudentDetail: { studentId: string };
+  AdminAddStudent: undefined;
+  AdminNotifications: undefined;
+  AdminFeeStructure: undefined;
+  AdminAnalytics: undefined;
+  AdminPayments: undefined;
+  AdminSettings: undefined;
+  
+  // Tab screens (listed for TS inference)
   Dashboard: undefined;
   History: undefined;
   Receipts: undefined;
@@ -58,6 +83,22 @@ function MainTabs() {
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Documents" component={DocumentsScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
+    </Tab.Navigator>
+  );
+}
+
+function AdminTabs() {
+  return (
+    <Tab.Navigator 
+      initialRouteName="AdminDashboard" 
+      tabBar={props => <AdminBottomNav {...props} />} 
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+      <Tab.Screen name="AdminStudents" component={AdminStudentsScreen} />
+      <Tab.Screen name="AdminFeeStructure" component={AdminFeeStructureScreen} />
+      <Tab.Screen name="AdminPayments" component={AdminPaymentsScreen} />
+      <Tab.Screen name="AdminAnalytics" component={AdminAnalyticsScreen} />
     </Tab.Navigator>
   );
 }
@@ -116,6 +157,17 @@ export default function App() {
             <Stack.Screen name="Notification" component={NotificationScreen} />
             <Stack.Screen name="Calendar" component={CalendarScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="DigitalIdentityCard" component={IdentityCardScreen} />
+            <Stack.Screen name="Security" component={SecurityScreen} />
+            <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+            <Stack.Screen name="AdminTabs" component={AdminTabs} />
+            <Stack.Screen name="AdminStudentDetail" component={AdminStudentDetailScreen} />
+            <Stack.Screen name="AdminAddStudent" component={AdminAddStudentScreen} />
+            <Stack.Screen name="AdminNotifications" component={AdminNotificationsScreen} />
+            <Stack.Screen name="AdminFeeStructure" component={AdminFeeStructureScreen} />
+            <Stack.Screen name="AdminAnalytics" component={AdminAnalyticsScreen} />
+            <Stack.Screen name="AdminPayments" component={AdminPaymentsScreen} />
+            <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </View>

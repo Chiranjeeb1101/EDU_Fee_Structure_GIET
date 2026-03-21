@@ -72,6 +72,65 @@ exports.getStudents = async (req, res) => {
   });
 };
 
+exports.getStudentById = async (req, res) => {
+  const adminCollegeId = req.user.college_id;
+  const { id } = req.params;
+  const student = await adminService.getStudentById(adminCollegeId, id);
+
+  res.status(200).json({
+    success: true,
+    data: student,
+  });
+};
+
+exports.updateStudent = async (req, res) => {
+  const adminCollegeId = req.user.college_id;
+  const { id } = req.params;
+  const updates = req.body;
+  
+  const updatedStudent = await adminService.updateStudent(adminCollegeId, id, updates);
+
+  res.status(200).json({
+    success: true,
+    message: 'Student updated successfully',
+    data: updatedStudent,
+  });
+};
+
+exports.deleteStudent = async (req, res) => {
+  const adminCollegeId = req.user.college_id;
+  const { id } = req.params;
+  
+  await adminService.deleteStudent(adminCollegeId, id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Student deleted successfully',
+  });
+};
+
+// ─── Analytics & Payments ─────────────────────────────────────────
+
+exports.getAdminStats = async (req, res) => {
+  const adminCollegeId = req.user.college_id;
+  const stats = await adminService.getAdminStats(adminCollegeId);
+
+  res.status(200).json({
+    success: true,
+    data: stats,
+  });
+};
+
+exports.getAllPayments = async (req, res) => {
+  const adminCollegeId = req.user.college_id;
+  const payments = await adminService.getAllPayments(adminCollegeId);
+
+  res.status(200).json({
+    success: true,
+    data: payments,
+  });
+};
+
 // ─── Admins ─────────────────────────────────────────────────────
 // Seed endpoint (could be restricted to super-admins in the future)
 exports.createAdmin = async (req, res) => {
