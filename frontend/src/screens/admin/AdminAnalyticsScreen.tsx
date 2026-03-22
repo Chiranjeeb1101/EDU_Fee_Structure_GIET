@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Alert, Dimensions, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
 import { colors } from '../../theme/colors';
 import { AdminGlowingBackground } from '../../components/layout/AdminGlowingBackground';
 import adminService, { AdminStats } from '../../services/adminService';
@@ -32,14 +33,44 @@ export const AdminAnalyticsScreen = () => {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={colors.violetAccent} />
-        <Text style={{ color: colors.textSecondary, marginTop: 15 }}>Compiling Reports...</Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 15 }}>Analyzing Institution Data...</Text>
       </View>
     );
   }
 
   const totalExpected = (stats.total_collected || 0) + (stats.total_pending || 0);
   const collectionRate = totalExpected > 0 ? ((stats.total_collected / totalExpected) * 100).toFixed(1) : '0';
-  const pendingRate = totalExpected > 0 ? ((stats.total_pending / totalExpected) * 100).toFixed(1) : '0';
+
+  // Chart Mappings
+  const chartConfig = {
+    backgroundGradientFrom: '#1E1E2E',
+    backgroundGradientTo: '#1E1E2E',
+    color: (opacity = 1) => `rgba(139, 92, 246, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+    strokeWidth: 2,
+    barPercentage: 0.5,
+    useShadowColorFromDataset: false,
+    decimalPlaces: 0,
+  };
+
+  const lineData = {
+    labels: stats.monthly_revenue.length > 0 ? stats.monthly_revenue.map(m => m.month) : ['No Data'],
+    datasets: [{
+      data: stats.monthly_revenue.length > 0 ? stats.monthly_revenue.map(m => m.amount / 1000) : [0], // in K
+      color: (opacity = 1) => `rgba(139, 92, 246, ${opacity})`,
+      strokeWidth: 2
+    }]
+  };
+
+  const pieData = stats.collection_by_stream.length > 0 
+    ? stats.collection_by_stream.map((s, i) => ({
+        name: s.name,
+        population: s.amount,
+        color: ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EF4444'][i % 5],
+        legendFontColor: '#A1A1AA',
+        legendFontSize: 12,
+      }))
+    : [{ name: 'N/A', population: 1, color: '#333', legendFontColor: '#666', legendFontSize: 12 }];
 
   return (
     <View style={styles.container}>
@@ -52,78 +83,101 @@ export const AdminAnalyticsScreen = () => {
             </TouchableOpacity>
             <View style={{ marginLeft: 8 }}>
               <Text style={styles.headerTitle}>Analytics</Text>
-              <Text style={styles.headerSub}>INSTITUTIONAL PERFORMANCE</Text>
+              <Text style={styles.headerSub}>INSTITUTIONAL FINANCIAL INTELLIGENCE</Text>
             </View>
           </View>
 
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             
-            {/* Overview Card */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(56, 189, 248, 0.1)' }]}>
-                  <MaterialIcons name="insights" size={20} color={colors.adminPrimary} />
-                </View>
-                <Text style={styles.cardTitle}>Collection Efficiency</Text>
+            {/* KPI Overview */}
+            <View style={styles.kpiRow}>
+              <View style={styles.kpiBox}>
+                <Text style={styles.kpiLabel}>COLLECTED</Text>
+                <Text style={[styles.kpiValue, { color: colors.success }]}>₹{(stats.total_collected / 100000).toFixed(2)}L</Text>
               </View>
-              <View style={styles.largeDataRow}>
-                <Text style={styles.massiveText}>{collectionRate}%</Text>
-                <Text style={styles.subText}>Funds Recovered</Text>
+              <View style={styles.kpiBox}>
+                <Text style={styles.kpiLabel}>PENDING</Text>
+                <Text style={[styles.kpiValue, { color: colors.warning }]}>₹{(stats.total_pending / 100000).toFixed(2)}L</Text>
               </View>
-              
-              {/* Visual Progress Bar */}
-              <View style={styles.progressContainer}>
-                <View style={[styles.progressSegment, { width: `${collectionRate}%` as any, backgroundColor: colors.success }]} />
-                <View style={[styles.progressSegment, { width: `${pendingRate}%` as any, backgroundColor: colors.warning }]} />
-              </View>
-
-              <View style={styles.legendRow}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
-                  <Text style={styles.legendText}>Collected: ₹{stats.total_collected.toLocaleString()}</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
-                  <Text style={styles.legendText}>Pending: ₹{stats.total_pending.toLocaleString()}</Text>
-                </View>
+              <View style={styles.kpiBox}>
+                <Text style={styles.kpiLabel}>EFFICIENCY</Text>
+                <Text style={[styles.kpiValue, { color: colors.adminPrimary }]}>{collectionRate}%</Text>
               </View>
             </View>
 
-            {/* Stats Row */}
-            <View style={styles.statsRow}>
-              <View style={styles.statBox}>
-                <View style={[styles.statIconBox, { backgroundColor: 'rgba(37, 99, 235, 0.1)' }]}>
-                  <MaterialIcons name="groups" size={24} color={colors.primary} />
-                </View>
-                <Text style={styles.statValue}>{stats.total_students}</Text>
-                <Text style={styles.statLabel}>Total Students</Text>
+            {/* Monthly Trend Chart */}
+            <View style={styles.sectionCard}>
+              <View style={styles.cardHeader}>
+                <MaterialIcons name="show-chart" size={20} color={colors.violetAccent} />
+                <Text style={styles.cardTitle}>Monthly Revenue Trend (₹'000)</Text>
               </View>
-              <View style={styles.statBox}>
-                <View style={[styles.statIconBox, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
-                  <MaterialIcons name="dynamic-form" size={24} color={colors.violetAccent} />
-                </View>
-                <Text style={styles.statValue}>{stats.active_fee_structures}</Text>
-                <Text style={styles.statLabel}>Fee Models</Text>
-              </View>
+              <LineChart
+                data={lineData}
+                width={width - 48}
+                height={200}
+                chartConfig={chartConfig}
+                bezier
+                style={styles.chart}
+              />
             </View>
 
-            {/* Projection Card (Visual Logic) */}
-            <View style={styles.card}>
+            {/* Stream Distribution Chart */}
+            <View style={styles.sectionCard}>
               <View style={styles.cardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
-                  <MaterialIcons name="trending-up" size={20} color={colors.success} />
+                <MaterialIcons name="pie-chart" size={20} color={colors.success} />
+                <Text style={styles.cardTitle}>Revenue by Stream</Text>
+              </View>
+              <PieChart
+                data={pieData}
+                width={width - 48}
+                height={200}
+                chartConfig={chartConfig}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="15"
+                absolute
+              />
+            </View>
+
+            {/* Status Breakdown Bar Chart */}
+            <View style={styles.sectionCard}>
+              <View style={styles.cardHeader}>
+                <MaterialIcons name="bar-chart" size={20} color={colors.warning} />
+                <Text style={styles.cardTitle}>Payment Status Distribution</Text>
+              </View>
+              <BarChart
+                data={{
+                  labels: ['Paid', 'Pending', 'Failed'],
+                  datasets: [{
+                    data: [
+                      stats.status_distribution.success,
+                      stats.status_distribution.pending,
+                      stats.status_distribution.failed
+                    ]
+                  }]
+                }}
+                width={width - 48}
+                height={220}
+                yAxisLabel=""
+                yAxisSuffix=""
+                chartConfig={{
+                  ...chartConfig,
+                  color: (opacity = 1) => `rgba(245, 158, 11, ${opacity})`,
+                }}
+                style={styles.chart}
+                fromZero
+              />
+            </View>
+
+            {/* Detailed Table Placeholder */}
+            <View style={styles.statsCard}>
+              <Text style={styles.statsTitle}>Stream-wise Summary</Text>
+              {stats.collection_by_stream.map((item, idx) => (
+                <View key={idx} style={styles.statLine}>
+                  <Text style={styles.statName}>{item.name}</Text>
+                  <Text style={styles.statAmt}>₹{item.amount.toLocaleString()}</Text>
                 </View>
-                <Text style={styles.cardTitle}>Monthly Volume</Text>
-              </View>
-              <Text style={styles.cardSubText}>Historical revenue distribution (mock data)</Text>
-              <View style={styles.chartArea}>
-                {[45, 65, 52, 85, 58, 92].map((h, i) => (
-                  <View key={i} style={styles.barColumn}>
-                    <View style={[styles.barFill, { height: `${h}%`, backgroundColor: i === 5 ? colors.success : 'rgba(139, 92, 246, 0.4)' }]} />
-                    <Text style={styles.barLabel}>{['Jan','Feb','Mar','Apr','May','Jun'][i]}</Text>
-                  </View>
-                ))}
-              </View>
+              ))}
             </View>
 
           </ScrollView>
@@ -144,64 +198,51 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   headerTitle: { color: colors.white, fontSize: 28, fontWeight: '800' },
-  headerSub: { color: colors.adminPrimary, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginTop: 4 },
+  headerSub: { color: colors.adminPrimary, fontSize: 10, fontWeight: '800', letterSpacing: 1.5, marginTop: 4, textTransform: 'uppercase' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   scrollContent: { paddingHorizontal: 24, paddingBottom: 100 },
-  card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  kpiRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  kpiBox: { 
+    width: (width - 64) / 3, 
+    backgroundColor: 'rgba(255,255,255,0.03)', 
+    borderRadius: 16, 
+    padding: 12, 
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)'
+  },
+  kpiLabel: { color: colors.textMuted, fontSize: 9, fontWeight: '700', marginBottom: 4 },
+  kpiValue: { fontSize: 16, fontWeight: '900' },
+  sectionCard: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
+    overflow: 'hidden'
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingLeft: 8 },
+  cardTitle: { color: colors.white, fontSize: 14, fontWeight: '700', marginLeft: 10 },
+  chart: {
+    borderRadius: 16,
+    marginVertical: 8,
+  },
+  statsCard: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
     borderRadius: 24,
     padding: 24,
-    marginBottom: 16,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  iconBox: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  cardTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginLeft: 12 },
-  cardSubText: { color: colors.textSecondary, fontSize: 12, marginBottom: 20 },
-  largeDataRow: { alignItems: 'center', marginBottom: 24 },
-  massiveText: { color: colors.white, fontSize: 56, fontWeight: '900', letterSpacing: -1 },
-  subText: { color: colors.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 2, fontWeight: '700' },
-  progressContainer: {
-    height: 8,
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 20,
-  },
-  progressSegment: { height: '100%' },
-  legendRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.1)', padding: 12, borderRadius: 12 },
-  legendItem: { flexDirection: 'row', alignItems: 'center' },
-  legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  legendText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  statBox: {
-    width: '48%',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 24,
-    padding: 20,
-    alignItems: 'center',
-  },
-  statIconBox: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  statValue: { color: colors.white, fontSize: 28, fontWeight: '900', marginBottom: 4 },
-  statLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  chartArea: {
-    height: 160,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingHorizontal: 8,
-  },
-  barColumn: { width: '12%', height: '100%', justifyContent: 'flex-end', alignItems: 'center' },
-  barFill: {
-    width: '100%',
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
   },
-  barLabel: { color: colors.textMuted, fontSize: 9, fontWeight: '800', marginTop: 10 },
+  statsTitle: { color: colors.white, fontSize: 18, fontWeight: '800', marginBottom: 20 },
+  statLine: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    paddingVertical: 12, 
+    borderBottomWidth: 1, 
+    borderBottomColor: 'rgba(255,255,255,0.05)' 
+  },
+  statName: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  statAmt: { color: colors.white, fontSize: 14, fontWeight: '700' },
 });

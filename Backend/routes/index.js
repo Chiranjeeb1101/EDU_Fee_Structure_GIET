@@ -14,5 +14,7 @@ router.use('/auth',     require('./auth.routes'));
 router.use('/admin',    require('./admin.routes'));
 router.use('/students', require('./student.routes'));
 router.use('/payments', require('./payment.routes'));
+router.use('/reset',    require('./reset.routes'));
 
 module.exports = router;
+

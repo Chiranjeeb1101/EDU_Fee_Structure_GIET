@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, LayoutAnimation, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, LayoutAnimation, Platform, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
@@ -143,7 +143,7 @@ export const AdminStudentsScreen = () => {
                 <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 40 }}>No students found.</Text>
               ) : (
                 filteredStudents.map(student => {
-                  const totalFee = Number(student.fee_structures?.total_amount) || 0;
+                  const totalFee = Number(student.total_fee) || 0;
                   const remainingFee = Number(student.remaining_fee) || 0;
                   const hasDues = remainingFee > 0;
                   
@@ -154,6 +154,15 @@ export const AdminStudentsScreen = () => {
                       onPress={() => (navigation as any).navigate('AdminStudentDetail', { studentId: student.id })}
                     >
                       <View style={styles.cardHeader}>
+                        <View style={styles.avatarFrame}>
+                          {student.users?.profile_picture ? (
+                            <Image source={{ uri: student.users.profile_picture }} style={styles.listAvatar} />
+                          ) : (
+                            <View style={styles.avatarInitials}>
+                              <Text style={styles.initialsText}>{student.users?.full_name?.charAt(0) || 'S'}</Text>
+                            </View>
+                          )}
+                        </View>
                         <View style={styles.cardInfo}>
                           <Text style={styles.studentName}>{student.users?.full_name || 'Unknown Student'}</Text>
                           <Text style={styles.studentId}>{student.college_id_number}</Text>
@@ -280,8 +289,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  cardInfo: { flex: 1, paddingRight: 16 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  avatarFrame: { marginRight: 12 },
+  listAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.05)' },
+  avatarInitials: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(37, 99, 235, 0.1)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(37, 99, 235, 0.3)' },
+  initialsText: { color: colors.primary, fontSize: 16, fontWeight: '800' },
+  cardInfo: { flex: 1 },
   studentName: { color: colors.white, fontSize: 16, fontWeight: '700', marginBottom: 4 },
   studentId: { color: colors.textSecondary, fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
   financialBadgeContainer: { alignItems: 'flex-end' },

@@ -10,8 +10,8 @@ export interface PaymentHistoryItem {
   id: string;
   amount: number;
   status: string;
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
+  stripe_checkout_session_id?: string;
+  stripe_payment_intent_id?: string;
   created_at: string;
 }
 
@@ -36,6 +36,43 @@ const studentService = {
   getPaymentHistory: async (): Promise<PaymentHistoryItem[]> => {
     const response = await api.get('/payments/history');
     return response.data.data;
+  },
+
+  getNotifications: async () => {
+    const response = await api.get('/students/notifications');
+    return response.data.data;
+  },
+
+  markNotificationRead: async (id: string) => {
+    const response = await api.put(`/students/notifications/${id}/read`);
+    return response.data;
+  },
+  
+  // --- Documents ---
+  getDocuments: async () => {
+    const response = await api.get('/students/documents');
+    return response.data.data;
+  },
+  
+  uploadDocument: async (fileUri: string, mimetype: string, name: string) => {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: fileUri,
+      type: mimetype,
+      name: name,
+    } as any);
+
+    const response = await api.post('/students/documents', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.data;
+  },
+  
+  deleteDocument: async (id: string) => {
+    const response = await api.delete(`/students/documents/${id}`);
+    return response.data;
   }
 };
 

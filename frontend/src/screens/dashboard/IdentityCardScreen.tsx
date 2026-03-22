@@ -1,15 +1,64 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Platform, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Platform, Dimensions, Image, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
+import ViewShot, { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
+import { useRef } from 'react';
 
 const { width } = Dimensions.get('window');
 
 export const IdentityCardScreen = () => {
   const navigation = useNavigation();
   const { user } = useAuth();
+  const viewShotRef = useRef<any>(null);
+
+  const handleSaveToGallery = async () => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant gallery access to save your identity card.');
+        return;
+      }
+
+      const uri = await captureRef(viewShotRef, {
+        format: 'png',
+        quality: 1.0,
+      });
+
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('Success', 'Digital Identity saved to your gallery!');
+    } catch (error) {
+      console.error('Save error:', error);
+      Alert.alert('Error', 'Failed to save identity card.');
+    }
+  };
+
+  const handleShareIdentity = async () => {
+    try {
+      const uri = await captureRef(viewShotRef, {
+        format: 'png',
+        quality: 1.0,
+      });
+
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Error', 'Sharing is not available on this device');
+        return;
+      }
+
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Share my Digital Identity',
+        UTI: 'public.png',
+      });
+    } catch (error) {
+      console.error('Share error:', error);
+      Alert.alert('Error', 'Failed to share identity card.');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -29,88 +78,90 @@ export const IdentityCardScreen = () => {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
           {/* Digital ID Card */}
-          <View style={styles.cardWrapper}>
-            <View style={styles.cardGlow} />
-            <View style={styles.cardBorder}>
-              <View style={styles.cardContent}>
-                
-                {/* Card Header Top */}
-                <View style={styles.cardHeaderTop}>
-                  <View style={styles.institutionInfo}>
-                    <View style={styles.schoolIconBox}>
-                      <MaterialIcons name="school" size={20} color="#000" />
+          <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }}>
+            <View style={styles.cardWrapper}>
+              <View style={styles.cardGlow} />
+              <View style={styles.cardBorder}>
+                <View style={styles.cardContent}>
+                  
+                  {/* Card Header Top */}
+                  <View style={styles.cardHeaderTop}>
+                    <View style={styles.institutionInfo}>
+                      <View style={styles.schoolIconBox}>
+                        <MaterialIcons name="school" size={20} color="#000" />
+                      </View>
+                      <View>
+                        <Text style={styles.instName}>EDU-Fee</Text>
+                        <Text style={styles.instDesc}>GIET UNIVERSITY</Text>
+                      </View>
                     </View>
+                    <View style={styles.activePassBadge}>
+                      <View style={styles.activeDot} />
+                      <Text style={styles.activePassText}>STUDENT ID</Text>
+                    </View>
+                  </View>
+
+                  {/* Profile Section */}
+                  <View style={styles.profileSection}>
+                    <View style={styles.avatarContainer}>
+                      <View style={styles.avatarGlow}>
+                        <Image 
+                          source={{ uri: user?.profile_picture || 'https://lh3.googleusercontent.com/aida-public/AB6AXuAP7c6BKhlg06MLobhj0M2A7aFjdsRXxVarCJoKlNsWM69F4glA_7JmXiOr86Is6g70T3DWr2XUvQK5JF0gMKLqTnC8UpACxoqSMF57ee8uFohF0juMeRgX5Vs_R0ASSMl9VdiWbL31t2Di2XVUIdLX2gm7x30ykuZQmjZS195IF9VBecZyLR8d_UXVknhN0CLwIvBdnTHwzjGeCau0dcM5XqEimb3wzc9S_kX6BDbc3PIdy48DR3qsjv8m5o1O8hd00g9LI8mOWJw' }} 
+                          style={styles.avatarImage} 
+                        />
+                      </View>
+                      <View style={styles.checkBadge}>
+                        <MaterialIcons name="verified" size={14} color="#003b52" />
+                      </View>
+                    </View>
+                    
+                    <Text style={styles.profileName}>{user?.full_name || 'Student Name'}</Text>
+                    
+                    <View style={styles.regBadge}>
+                      <Text style={styles.regLabel}>REG ID</Text>
+                      <Text style={styles.regValue}>{user?.college_id_number || '2026-XXXX-XXXX'}</Text>
+                    </View>
+                  </View>
+
+                  {/* Details Grid */}
+                  <View style={styles.detailsGrid}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.detailLabel}>DEPARTMENT</Text>
+                      <Text style={styles.detailValue} numberOfLines={2}>{user?.stream || 'N/A'}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', marginLeft: 16 }}>
+                      <Text style={styles.detailLabel}>COURSE</Text>
+                      <Text style={[styles.detailValue, { textTransform: 'uppercase' }]}>{user?.course_type || 'N/A'}</Text>
+                    </View>
+                  </View>
+
+                  {/* QR Section */}
+                  <View style={styles.qrSection}>
                     <View>
-                      <Text style={styles.instName}>EDU-Fee</Text>
-                      <Text style={styles.instDesc}>GIET UNIVERSITY</Text>
+                      <View style={styles.scannerStatus}>
+                        <View style={styles.scannerDot} />
+                        <Text style={styles.scannerText}>SECURE SCAN</Text>
+                      </View>
+                      <Text style={styles.verifiedText}>Verified Campus Access</Text>
+                    </View>
+                    <View style={styles.qrIconBox}>
+                      <MaterialIcons name="qr-code-2" size={40} color="#090e1c" />
                     </View>
                   </View>
-                  <View style={styles.activePassBadge}>
-                    <View style={styles.activeDot} />
-                    <Text style={styles.activePassText}>STUDENT ID</Text>
-                  </View>
-                </View>
 
-                {/* Profile Section */}
-                <View style={styles.profileSection}>
-                  <View style={styles.avatarContainer}>
-                    <View style={styles.avatarGlow}>
-                      <Image 
-                        source={{ uri: user?.profile_picture || 'https://lh3.googleusercontent.com/aida-public/AB6AXuAP7c6BKhlg06MLobhj0M2A7aFjdsRXxVarCJoKlNsWM69F4glA_7JmXiOr86Is6g70T3DWr2XUvQK5JF0gMKLqTnC8UpACxoqSMF57ee8uFohF0juMeRgX5Vs_R0ASSMl9VdiWbL31t2Di2XVUIdLX2gm7x30ykuZQmjZS195IF9VBecZyLR8d_UXVknhN0CLwIvBdnTHwzjGeCau0dcM5XqEimb3wzc9S_kX6BDbc3PIdy48DR3qsjv8m5o1O8hd00g9LI8mOWJw' }} 
-                        style={styles.avatarImage} 
-                      />
-                    </View>
-                    <View style={styles.checkBadge}>
-                      <MaterialIcons name="verified" size={14} color="#003b52" />
-                    </View>
-                  </View>
-                  
-                  <Text style={styles.profileName}>{user?.full_name || 'Student Name'}</Text>
-                  
-                  <View style={styles.regBadge}>
-                    <Text style={styles.regLabel}>REG ID</Text>
-                    <Text style={styles.regValue}>{user?.college_id_number || '2026-XXXX-XXXX'}</Text>
-                  </View>
                 </View>
-
-                {/* Details Grid */}
-                <View style={styles.detailsGrid}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.detailLabel}>DEPARTMENT</Text>
-                    <Text style={styles.detailValue} numberOfLines={2}>{user?.stream || 'N/A'}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end', marginLeft: 16 }}>
-                    <Text style={styles.detailLabel}>COURSE</Text>
-                    <Text style={[styles.detailValue, { textTransform: 'uppercase' }]}>{user?.course_type || 'N/A'}</Text>
-                  </View>
-                </View>
-
-                {/* QR Section */}
-                <View style={styles.qrSection}>
-                  <View>
-                    <View style={styles.scannerStatus}>
-                      <View style={styles.scannerDot} />
-                      <Text style={styles.scannerText}>SECURE SCAN</Text>
-                    </View>
-                    <Text style={styles.verifiedText}>Verified Campus Access</Text>
-                  </View>
-                  <View style={styles.qrIconBox}>
-                    <MaterialIcons name="qr-code-2" size={40} color="#090e1c" />
-                  </View>
-                </View>
-
               </View>
             </View>
-          </View>
+          </ViewShot>
 
           {/* Action Area */}
           <View style={styles.actionArea}>
-            <TouchableOpacity style={styles.secondaryButton}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleSaveToGallery}>
               <MaterialIcons name="file-download" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
               <Text style={styles.secondaryText}>SAVE TO GALLERY</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.secondaryButton}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleShareIdentity}>
               <MaterialIcons name="share" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
               <Text style={styles.secondaryText}>SHARE IDENTITY</Text>
             </TouchableOpacity>

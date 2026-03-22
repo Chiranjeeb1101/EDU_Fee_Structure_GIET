@@ -7,8 +7,8 @@ import { AdminGlowingBackground } from '../../components/layout/AdminGlowingBack
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
-const SettingItem = ({ icon, title, subtitle, onPress, color, danger }: any) => (
-  <TouchableOpacity style={[styles.settingItem, danger && styles.settingItemDanger]} onPress={onPress}>
+const SettingItem = ({ icon, title, subtitle, onPress, color, danger, showToggle, toggleActive, onToggle }: any) => (
+  <TouchableOpacity style={[styles.settingItem, danger && styles.settingItemDanger]} onPress={onToggle || onPress}>
     <View style={[styles.settingIconBox, { backgroundColor: danger ? 'rgba(239,68,68,0.1)' : `${color || colors.adminPrimary}1A` }]}>
       <MaterialIcons name={icon} size={22} color={danger ? colors.error : (color || colors.adminPrimary)} />
     </View>
@@ -16,13 +16,19 @@ const SettingItem = ({ icon, title, subtitle, onPress, color, danger }: any) => 
       <Text style={[styles.settingTitle, danger && { color: colors.error }]}>{title}</Text>
       {subtitle ? <Text style={styles.settingSubtitle}>{subtitle}</Text> : null}
     </View>
-    <MaterialIcons name="chevron-right" size={22} color={danger ? colors.error : colors.textSecondary} />
+    {showToggle ? (
+      <View style={[styles.toggleBg, toggleActive && styles.toggleBgActive]}>
+        <View style={[styles.toggleThumb, toggleActive && styles.toggleThumbActive]} />
+      </View>
+    ) : (
+      <MaterialIcons name="chevron-right" size={22} color={danger ? colors.error : colors.textSecondary} />
+    )}
   </TouchableOpacity>
 );
 
 export const AdminSettingsScreen = () => {
   const navigation = useNavigation();
-  const { logout, user } = useAuth();
+  const { logout, user, isBioEnabled, toggleBiometrics } = useAuth();
   
   // Profile Edit state
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -46,10 +52,6 @@ export const AdminSettingsScreen = () => {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Logout', style: 'destructive', onPress: async () => {
           await logout();
-          (navigation as any).reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          });
         }
       }
     ]);
@@ -148,6 +150,15 @@ export const AdminSettingsScreen = () => {
                 subtitle="Update your login password" 
                 color={colors.violetAccent}
                 onPress={() => setShowPasswordReset(true)}
+              />
+              <SettingItem 
+                icon="fingerprint" 
+                title="Biometric Login" 
+                subtitle="FaceID / Fingerprint" 
+                color={colors.primary}
+                showToggle
+                toggleActive={isBioEnabled}
+                onToggle={() => toggleBiometrics(!isBioEnabled)}
               />
               <SettingItem 
                 icon="notifications" 
@@ -357,6 +368,10 @@ const styles = StyleSheet.create({
   settingInfo: { flex: 1 },
   settingTitle: { color: colors.white, fontSize: 15, fontWeight: '600', marginBottom: 2 },
   settingSubtitle: { color: colors.textSecondary, fontSize: 12 },
+  toggleBg: { width: 44, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', paddingHorizontal: 2 },
+  toggleBgActive: { backgroundColor: colors.adminPrimary },
+  toggleThumb: { width: 18, height: 18, borderRadius: 9, backgroundColor: colors.textSecondary },
+  toggleThumbActive: { backgroundColor: colors.white, transform: [{ translateX: 22 }] },
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalContent: {

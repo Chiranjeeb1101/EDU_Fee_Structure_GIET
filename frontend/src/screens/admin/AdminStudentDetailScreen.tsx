@@ -36,12 +36,14 @@ export const AdminStudentDetailScreen = () => {
 
   const openEditModal = async () => {
     setEditForm({
+      full_name: student.users?.full_name || '',
+      personal_email: student.users?.personal_email || '',
       course_type: student.course_type || '',
       stream: student.stream || '',
       year: student.year?.toString() || '',
       accommodation: student.accommodation || '',
       remaining_fee: student.remaining_fee?.toString() || '0',
-      fee_structure_id: student.fee_structure_id || '',
+      total_fee: student.total_fee?.toString() || '0',
     });
     setShowEdit(true);
     
@@ -58,12 +60,14 @@ export const AdminStudentDetailScreen = () => {
     setUpdating(true);
     try {
       const updates = {
+        full_name: editForm.full_name,
+        personal_email: editForm.personal_email,
         course_type: editForm.course_type,
         stream: editForm.stream,
         year: parseInt(editForm.year) || null,
         accommodation: editForm.accommodation,
         remaining_fee: parseFloat(editForm.remaining_fee) || 0,
-        fee_structure_id: editForm.fee_structure_id,
+        total_fee: parseFloat(editForm.total_fee) || 0,
       };
       await adminService.updateStudent(studentId, updates);
       Alert.alert('Success', 'Student details updated');
@@ -76,7 +80,25 @@ export const AdminStudentDetailScreen = () => {
     }
   };
 
+  const SelectionPill = ({ label, options, selected, onSelect }: any) => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <View style={styles.pillContainer}>
+        {options.map((opt: string) => (
+          <TouchableOpacity
+            key={opt}
+            style={[styles.pill, selected === opt && styles.pillActive]}
+            onPress={() => onSelect(opt)}
+          >
+            <Text style={[styles.pillText, selected === opt && styles.pillTextActive]}>{opt}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+
   const handleDelete = () => {
+    // ... no changes here
     Alert.alert(
       'Delete Student',
       `Are you sure you want to permanently delete ${student?.users?.full_name || 'this student'}? This action cannot be undone.`,
@@ -148,7 +170,7 @@ export const AdminStudentDetailScreen = () => {
 
   if (!student) return null;
 
-  const totalFee = Number(student.fee_structures?.total_amount) || 0;
+  const totalFee = Number(student.total_fee) || 0;
   const remainingFee = Number(student.remaining_fee) || 0;
   const paidAmount = totalFee - remainingFee;
   const progressPercent = totalFee > 0 ? (paidAmount / totalFee) * 100 : 0;
@@ -175,8 +197,8 @@ export const AdminStudentDetailScreen = () => {
             {/* Profile Hero */}
             <View style={styles.heroSection}>
               <View style={styles.avatarContainer}>
-                {student.users?.profile_picture_url ? (
-                  <Image source={{ uri: student.users.profile_picture_url }} style={styles.avatar} />
+                {student.users?.profile_picture ? (
+                  <Image source={{ uri: student.users.profile_picture }} style={styles.avatar} />
                 ) : (
                   <View style={styles.avatarPlaceholder}>
                     <Text style={styles.avatarText}>{student.users?.full_name?.charAt(0) || 'S'}</Text>
@@ -302,6 +324,32 @@ export const AdminStudentDetailScreen = () => {
                 </View>
 
                 <ScrollView showsVerticalScrollIndicator={false}>
+                  
+                  {/* Personal Identity Fields */}
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Full Name</Text>
+                    <TextInput 
+                      style={styles.input} 
+                      value={editForm.full_name} 
+                      onChangeText={t => setEditForm({...editForm, full_name: t})} 
+                      placeholder="Student Full Name"
+                      placeholderTextColor={colors.textSecondary} 
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Personal Email</Text>
+                    <TextInput 
+                      style={styles.input} 
+                      value={editForm.personal_email} 
+                      onChangeText={t => setEditForm({...editForm, personal_email: t})} 
+                      placeholder="Personal Email Address"
+                      placeholderTextColor={colors.textSecondary} 
+                    />
+                  </View>
+
+                  <View style={styles.divider} />
+
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Fee Structure Assignment</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.feeSelector}>
@@ -318,35 +366,60 @@ export const AdminStudentDetailScreen = () => {
                           })}
                         >
                           <Text style={[styles.feeOptionText, editForm.fee_structure_id === s.id && styles.feeOptionTextActive]}>{s.title}</Text>
-                          <Text style={styles.feeOptionSub}>₹{(s.total_amount || 0).toLocaleString()}</Text>
+                          <Text style={styles.feeOptionSub}>₹{(s.total_fee || 0).toLocaleString()}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
                   </View>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Course Type</Text>
-                    <TextInput style={styles.input} value={editForm.course_type} onChangeText={t => setEditForm({...editForm, course_type: t})} placeholderTextColor={colors.textSecondary} />
-                  </View>
+                  <SelectionPill 
+                    label="Course Type" 
+                    options={['B.Tech', 'M.Tech', 'BCA', 'MCA']} 
+                    selected={editForm.course_type} 
+                    onSelect={(val: string) => setEditForm({...editForm, course_type: val})} 
+                  />
+                  
+                  <SelectionPill 
+                    label="Stream" 
+                    options={['CSE', 'ECE', 'ME', 'CE', 'EEE']} 
+                    selected={editForm.stream} 
+                    onSelect={(val: string) => setEditForm({...editForm, stream: val})} 
+                  />
+
+                  <SelectionPill 
+                    label="Year" 
+                    options={['1', '2', '3', '4']} 
+                    selected={editForm.year} 
+                    onSelect={(val: string) => setEditForm({...editForm, year: val})} 
+                  />
+
+                  <SelectionPill 
+                    label="Accommodation" 
+                    options={['day_scholar', 'hosteler']} 
+                    selected={editForm.accommodation} 
+                    onSelect={(val: string) => setEditForm({...editForm, accommodation: val})} 
+                  />
 
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Stream</Text>
-                    <TextInput style={styles.input} value={editForm.stream} onChangeText={t => setEditForm({...editForm, stream: t})} placeholderTextColor={colors.textSecondary} />
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Year</Text>
-                    <TextInput style={styles.input} value={editForm.year} onChangeText={t => setEditForm({...editForm, year: t})} keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Accommodation</Text>
-                    <TextInput style={styles.input} value={editForm.accommodation} onChangeText={t => setEditForm({...editForm, accommodation: t})} placeholder="day_scholar / hosteler" placeholderTextColor={colors.textSecondary} />
+                    <Text style={styles.inputLabel}>Total Fee Amount (₹)</Text>
+                    <TextInput 
+                      style={styles.input} 
+                      value={editForm.total_fee} 
+                      onChangeText={t => setEditForm({...editForm, total_fee: t})} 
+                      keyboardType="numeric" 
+                      placeholderTextColor={colors.textSecondary} 
+                    />
                   </View>
 
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Remaining Fee Balance (₹)</Text>
-                    <TextInput style={styles.input} value={editForm.remaining_fee} onChangeText={t => setEditForm({...editForm, remaining_fee: t})} keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+                    <TextInput 
+                      style={styles.input} 
+                      value={editForm.remaining_fee} 
+                      onChangeText={t => setEditForm({...editForm, remaining_fee: t})} 
+                      keyboardType="numeric" 
+                      placeholderTextColor={colors.textSecondary} 
+                    />
                   </View>
 
                   <TouchableOpacity style={styles.saveBtn} onPress={handleUpdate} disabled={updating}>
@@ -553,4 +626,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deleteBtnText: { color: colors.error, fontSize: 14, fontWeight: '700' },
+  pillContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  pill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  pillActive: {
+    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+    borderColor: colors.primary,
+  },
+  pillText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  pillTextActive: { color: colors.white, fontWeight: '700' },
 });

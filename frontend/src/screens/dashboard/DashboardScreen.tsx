@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Dimensions, LayoutAnimation, Platform, Modal, Pressable, Image } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Dimensions, LayoutAnimation, Platform, Modal, Pressable, Image, TextInput, Animated, Easing } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../App';
@@ -7,6 +7,7 @@ import { colors } from '../../theme/colors';
 import { GlowingBackground } from '../../components/layout/GlowingBackground';
 import { useAuth } from '../../context/AuthContext';
 import studentService, { DashboardData } from '../../services/studentService';
+import paymentService from '../../services/paymentService';
 import { MaterialIcons } from '@expo/vector-icons';
 import { UIManager } from 'react-native';
 
@@ -55,34 +56,136 @@ export const DashboardScreen = () => {
   // Fee Toggle State
   const [showPending, setShowPending] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
-  const autoRevertTimer = React.useRef<any>(null);
+  const autoRotateRef = useRef<any>(null);
+  const manualOverrideRef = useRef(false);
 
+  // Payment State
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // ─── ANIMATED FEE CARD ──────────────────────────────────────
+  const flipAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+
+  // Glow pulse for auto-cycle indicator
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  // Animate the flip transition
+  const animateFlip = (callback: () => void) => {
+    Animated.parallel([
+      Animated.timing(flipAnim, { toValue: 0, duration: 250, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 0.92, duration: 250, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+    ]).start(() => {
+      callback();
+      Animated.parallel([
+        Animated.spring(flipAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+      ]).start();
+    });
+  };
+
+  // Auto-rotate every 3 seconds
+  useEffect(() => {
+    autoRotateRef.current = setInterval(() => {
+      if (!manualOverrideRef.current) {
+        animateFlip(() => setShowPending(prev => !prev));
+      }
+    }, 3000);
+    return () => { if (autoRotateRef.current) clearInterval(autoRotateRef.current); };
+  }, []);
+
+  // Manual tap toggle — resets auto timer
   const handleToggleFeeView = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const newVal = !showPending;
-    setShowPending(newVal);
+    // Stop auto-rotate temporarily
+    manualOverrideRef.current = true;
+    if (autoRotateRef.current) clearInterval(autoRotateRef.current);
 
-    if (autoRevertTimer.current) clearTimeout(autoRevertTimer.current);
+    animateFlip(() => setShowPending(prev => !prev));
 
-    if (newVal) {
-      autoRevertTimer.current = setTimeout(() => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setShowPending(false);
-      }, 5000);
-    }
+    // Resume auto-rotate after 6 seconds of inactivity
+    setTimeout(() => {
+      manualOverrideRef.current = false;
+      autoRotateRef.current = setInterval(() => {
+        animateFlip(() => setShowPending(prev => !prev));
+      }, 3000);
+    }, 6000);
   };
 
   useEffect(() => {
     fetchDashboard();
   }, []);
 
+  // Auto-refresh when returning from PaymentWebView
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboard();
+    }, [])
+  );
+
+  const handleInitiatePayment = async () => {
+    const amt = parseFloat(paymentAmount);
+    if (isNaN(amt) || amt <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0.');
+      return;
+    }
+    const feeStatus = dashboardData?.fee_status || { total_fee: 0, paid_fee: 0, remaining_fee: 0 };
+    if (amt > feeStatus.remaining_fee) {
+      Alert.alert('Invalid Amount', 'You cannot pay more than the remaining fee.');
+      return;
+    }
+
+    try {
+      setIsProcessingPayment(true);
+      const res = await paymentService.createCheckoutSession(amt);
+      
+      if (res.success && res.data.session_url) {
+        setShowPaymentModal(false);
+        // Navigate to in-app PaymentWebView instead of opening external browser
+        navigation.navigate('PaymentWebView' as any, { checkoutUrl: res.data.session_url });
+      } else {
+        Alert.alert('Payment Failed', 'Could not initiate secure checkout.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to start payment process.');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const openPaymentModal = () => {
+    const feeStatus = dashboardData?.fee_status || { total_fee: 0, paid_fee: 0, remaining_fee: 0 };
+    if (feeStatus.remaining_fee <= 0) {
+      Alert.alert('All Clear!', 'You have no pending fees to pay.');
+      return;
+    }
+    setPaymentAmount(feeStatus.remaining_fee.toString());
+    setShowPaymentModal(true);
+  };
+
   const fetchDashboard = async () => {
     try {
       const data = await studentService.getDashboardData();
       setDashboardData(data);
-    } catch (error) {
-      console.error('Dashboard fetch failed:', error);
-      Alert.alert('Error', 'Failed to sync dashboard data with server.');
+    } catch (error: any) {
+      // 401 errors are handled silently by the API interceptor (auto-logout).
+      // Only show the alert for genuinely unexpected errors (network down, server crash, etc).
+      const status = error?.response?.status;
+      if (status !== 401) {
+        console.error('Dashboard fetch failed:', error);
+        Alert.alert('Error', 'Failed to sync dashboard data with server.');
+      }
     } finally {
       setLoading(false);
     }
@@ -136,7 +239,14 @@ export const DashboardScreen = () => {
               <View style={styles.featuredGlow} />
               <View style={styles.featuredCard}>
                 <TouchableOpacity activeOpacity={0.9} style={styles.feeTop} onPress={handleToggleFeeView}>
-                  <View>
+                  <Animated.View style={{
+                    opacity: flipAnim,
+                    transform: [
+                      { scale: scaleAnim },
+                      { perspective: 800 },
+                      { rotateX: flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['90deg', '0deg'] }) },
+                    ],
+                  }}>
                     <Text style={[styles.feeTitle, showPending && { color: colors.error }]}>
                       {showPending ? 'PENDING DUE' : 'TOTAL DUE'}
                     </Text>
@@ -144,11 +254,12 @@ export const DashboardScreen = () => {
                       ₹{showPending ? feeStatus.remaining_fee.toLocaleString() : feeStatus.total_fee.toLocaleString()}
                     </Text>
                     <View style={styles.feeToggleHint}>
+                      <Animated.View style={[styles.autoRotateDot, { opacity: pulseAnim, backgroundColor: showPending ? colors.error : colors.primary }]} />
                       <MaterialIcons name="touch-app" size={12} color={showPending ? colors.error : colors.primary} style={{ opacity: 0.8 }} />
                       <Text style={[styles.feeToggleText, showPending && { color: colors.error }]}>Tap to toggle view</Text>
                     </View>
-                  </View>
-                  <TouchableOpacity style={styles.payBtn}>
+                  </Animated.View>
+                  <TouchableOpacity style={styles.payBtn} onPress={openPaymentModal}>
                     <Text style={styles.payBtnText}>Pay Now</Text>
                   </TouchableOpacity>
                 </TouchableOpacity>
@@ -283,6 +394,115 @@ export const DashboardScreen = () => {
             </Pressable>
           </Modal>
 
+          {/* Premium Payment Modal */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={showPaymentModal}
+            onRequestClose={() => !isProcessingPayment && setShowPaymentModal(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.premiumPaymentModal}>
+                {/* Drag Indicator */}
+                <View style={styles.dragIndicator} />
+                
+                <View style={styles.modalHeaderRow}>
+                  <View>
+                    <Text style={styles.paymentTitle}>Secure Checkout</Text>
+                    <Text style={styles.paymentSubTitle}>Enter amount to proceed</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.closeIconBtn}
+                    onPress={() => !isProcessingPayment && setShowPaymentModal(false)}
+                  >
+                    <MaterialIcons name="close" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Input Area */}
+                <View style={styles.premiumInputCard}>
+                  <Text style={styles.currencySymbol}>₹</Text>
+                  <TextInput
+                    style={styles.premiumAmountInput}
+                    value={paymentAmount}
+                    onChangeText={setPaymentAmount}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor="rgba(255,255,255,0.2)"
+                    editable={!isProcessingPayment}
+                    autoFocus={true}
+                    selectionColor={colors.primary}
+                  />
+                </View>
+                
+                <View style={styles.balanceInfoRow}>
+                  <Text style={styles.balanceInfoLabel}>Maximum Limit</Text>
+                  <Text style={styles.balanceInfoValue}>₹{feeStatus.remaining_fee.toLocaleString()}</Text>
+                </View>
+
+                {/* Transaction Details Breakdown */}
+                <View style={styles.transactionBreakdown}>
+                  <Text style={styles.breakdownHeader}>TRANSACTION DETAILS</Text>
+                  
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>Paying Amount</Text>
+                    <Text style={styles.breakdownValue}>₹{parseFloat(paymentAmount) > 0 ? parseFloat(paymentAmount).toLocaleString() : '0'}</Text>
+                  </View>
+                  
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>Processing Fee</Text>
+                    <Text style={styles.breakdownValueFree}>Free</Text>
+                  </View>
+                  
+                  <View style={styles.breakdownDivider} />
+                  
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownTotalLabel}>Total Settlement</Text>
+                    <Text style={styles.breakdownTotalValue}>₹{parseFloat(paymentAmount) > 0 ? parseFloat(paymentAmount).toLocaleString() : '0'}</Text>
+                  </View>
+                </View>
+
+                {/* Secure Trust Badges */}
+                <View style={styles.trustBadgesRow}>
+                  <View style={styles.trustBadge}>
+                    <MaterialIcons name="security" size={14} color={colors.textSecondary} />
+                    <Text style={styles.trustBadgeText}>256-bit Encrypted</Text>
+                  </View>
+                  <View style={styles.trustBadge}>
+                    <MaterialIcons name="verified-user" size={14} color={colors.textSecondary} />
+                    <Text style={styles.trustBadgeText}>PCI DSS Compliant</Text>
+                  </View>
+                </View>
+
+                {/* Pay Button */}
+                <TouchableOpacity 
+                  style={[styles.premiumPayBtn, isProcessingPayment && { opacity: 0.7 }]} 
+                  onPress={handleInitiatePayment}
+                  disabled={isProcessingPayment}
+                  activeOpacity={0.8}
+                >
+                  {isProcessingPayment ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <ActivityIndicator color={colors.white} size="small" style={{ marginRight: 10 }} />
+                      <Text style={styles.premiumPayBtnText}>Initiating Gateway...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.premiumPayBtnText}>
+                      Pay ₹{parseFloat(paymentAmount) > 0 ? parseFloat(paymentAmount).toLocaleString() : '0'} Now
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                {/* Powered by Stripe */}
+                <View style={styles.poweredByStripe}>
+                  <MaterialIcons name="lock" size={12} color={colors.success} style={{ marginRight: 4 }} />
+                  <Text style={styles.poweredText}>Powered securely by <Text style={styles.stripeBrand}>Stripe</Text></Text>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+
         </SafeAreaView>
       </GlowingBackground>
     </View>
@@ -413,6 +633,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginLeft: 4,
+  },
+  autoRotateDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
   },
   payBtn: {
     backgroundColor: colors.primary,
@@ -748,5 +974,194 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 12,
     letterSpacing: 1.5,
+  },
+  // Premium Payment Modal Styles
+  premiumPaymentModal: {
+    backgroundColor: '#0d1323',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    minHeight: 450,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  dragIndicator: {
+    width: 40,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  paymentTitle: {
+    color: colors.white,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  paymentSubTitle: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  closeIconBtn: {
+    padding: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  premiumInputCard: {
+    backgroundColor: 'rgba(30, 37, 59, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(144, 171, 255, 0.2)',
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    marginBottom: 12,
+  },
+  currencySymbol: {
+    color: colors.textSecondary,
+    fontSize: 32,
+    fontWeight: '800',
+    marginRight: 8,
+  },
+  premiumAmountInput: {
+    color: colors.white,
+    fontSize: 40,
+    fontWeight: '800',
+    textAlign: 'center',
+    minWidth: 100,
+  },
+  balanceInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    marginBottom: 24,
+  },
+  balanceInfoLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  balanceInfoValue: {
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  transactionBreakdown: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  breakdownHeader: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 12,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  breakdownLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
+  breakdownValue: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  breakdownValueFree: {
+    color: colors.success,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  breakdownDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginVertical: 12,
+  },
+  breakdownTotalLabel: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  breakdownTotalValue: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  trustBadgesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 24,
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  trustBadgeText: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    marginLeft: 6,
+    fontWeight: '600',
+  },
+  premiumPayBtn: {
+    backgroundColor: colors.primary,
+    paddingVertical: 18,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  premiumPayBtnText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  poweredByStripe: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  poweredText: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  stripeBrand: {
+    color: colors.white,
+    fontWeight: '800',
   },
 });

@@ -12,11 +12,22 @@ const { width } = Dimensions.get('window');
 export const RegistrationSuccessScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'RegistrationSuccess'>>();
-  const { user: authUser } = useAuth();
+  const { completeRegistration, user: authUser } = useAuth();
 
   // Combine data from params or auth context
   const user = route.params?.user || authUser;
   const student = route.params?.student || (authUser as any)?.students?.[0];
+  const token = route.params?.token;
+
+  const handleContinue = async () => {
+    if (token && user) {
+      await completeRegistration(token, user);
+      // navigation reset is NOT needed, AuthContext state change handles it
+    } else {
+      // Fallback if token is missing
+      navigation.navigate('Login');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -121,7 +132,7 @@ export const RegistrationSuccessScreen = () => {
             <TouchableOpacity 
               style={styles.primaryButton} 
               activeOpacity={0.8}
-              onPress={() => navigation.navigate('MainTabs')}
+              onPress={handleContinue}
             >
               <Text style={styles.primaryText}>Continue to Dashboard</Text>
               <MaterialIcons name="arrow-forward" size={24} color="#000" />
@@ -200,7 +211,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   titleHighlight: {
-    color: colors.primary, // Using primary since react native gradients on text is complex without maskedview
+    color: colors.primary, 
   },
   subtitle: {
     fontSize: 14,
@@ -225,7 +236,7 @@ const styles = StyleSheet.create({
   cardBorder: {
     borderRadius: 40,
     padding: 2,
-    backgroundColor: 'rgba(144, 171, 255, 0.3)', // Simulated holographic border
+    backgroundColor: 'rgba(144, 171, 255, 0.3)', 
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.5,

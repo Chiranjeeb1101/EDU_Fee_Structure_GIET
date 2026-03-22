@@ -38,6 +38,8 @@ export interface UserData {
   course_type?: string;
   accommodation?: string;
   year?: number;
+  parent_name?: string;
+  parent_whatsapp?: string;
 }
 
 export interface LoginResponse {
@@ -53,6 +55,7 @@ export interface RegisterResponse {
   success: boolean;
   message: string;
   data: {
+    token: string;
     user: any;
     student: any;
   };
@@ -76,10 +79,17 @@ const authService = {
       full_name: rawUser.full_name,
       role: rawUser.role,
       college_id_number: rawUser.college_id_number,
+      registration_number: rawUser.registration_number,
       profile_complete: rawUser.profile_complete,
-      // If login returns more student info, map it here
+      profile_picture: rawUser.profile_picture,
+      personal_email: rawUser.personal_email,
+      student_phone: rawUser.student_phone,
       stream: rawUser.stream,
       course_type: rawUser.course_type,
+      accommodation: rawUser.accommodation,
+      year: rawUser.year,
+      parent_name: rawUser.parent_name,
+      parent_whatsapp: rawUser.parent_whatsapp,
     };
 
     await AsyncStorage.setItem('auth_token', token);
@@ -138,7 +148,7 @@ const authService = {
   logout: async () => {
     await AsyncStorage.removeItem('auth_token');
     await AsyncStorage.removeItem('user_data');
-    await AsyncStorage.removeItem('saved_credentials');
+    // We keep saved_credentials for "Remember Me" and Biometric login
   },
 
   /**
@@ -174,6 +184,9 @@ const authService = {
           course_type: rawUser.students?.[0]?.course_type,
           accommodation: rawUser.students?.[0]?.accommodation,
           year: rawUser.students?.[0]?.year,
+          registration_number: rawUser.students?.[0]?.registration_number,
+          parent_name: rawUser.students?.[0]?.parent_name,
+          parent_whatsapp: rawUser.students?.[0]?.parent_whatsapp,
         };
         await AsyncStorage.setItem('user_data', JSON.stringify(updatedUser));
         return { success: true, user: updatedUser };

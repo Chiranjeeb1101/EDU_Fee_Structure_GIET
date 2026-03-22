@@ -8,8 +8,12 @@ import { Platform } from 'react-native';
 // For physical devices via Expo tunnel, use your machine's LAN IP or ngrok URL
 const getBaseUrl = () => {
   if (__DEV__) {
-    // Using your machine's local IP network address instead of localhost/10.0.2.2
-    // so that physical devices running Expo Go can reach the backend over Wi-Fi.
+    // For Web development
+    if (Platform.OS === 'web') {
+      return 'http://localhost:5000/api';
+    }
+    // For Mobile development (Android Emulator, iOS Simulator, or Physical Device)
+    // Using current machine IP: 10.225.103.101
     return 'http://10.225.103.101:5000/api';
   }
   // Production URL (update when deployed)
@@ -42,13 +46,23 @@ api.interceptors.request.use(
 );
 
 // ─── Response Interceptor (Handle Errors Globally) ───────────────
+let onUnauthorizedCallback: (() => void) | null = null;
+
+export const setOnUnauthorized = (cb: () => void) => {
+  onUnauthorizedCallback = cb;
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid — clear storage
+      // Token expired or invalid
+      console.warn('API returned 401 — triggering logout');
       await AsyncStorage.removeItem('auth_token');
       await AsyncStorage.removeItem('user_data');
+      if (onUnauthorizedCallback) {
+        onUnauthorizedCallback();
+      }
     }
     return Promise.reject(error);
   }

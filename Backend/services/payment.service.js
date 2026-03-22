@@ -52,7 +52,7 @@ class PaymentService {
 
     // 4. Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'upi'],
       mode: 'payment',
       currency: 'inr',
       line_items: [
@@ -73,8 +73,8 @@ class PaymentService {
         college_id: student.college_id,
         user_id: userId,
       },
-      success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/cancel`,
+      success_url: `${process.env.BACKEND_URL}/api/payments/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.BACKEND_URL}/api/payments/cancel`,
     });
 
     // 5. Insert a 'created' payment record in DB
@@ -149,6 +149,24 @@ class PaymentService {
     }
 
     return { received: true, type: event.type };
+  }
+
+  /**
+   * Manual fallback: Verify a session with Stripe and fulfill it.
+   * Useful for local development when webhooks can't reach the server.
+   */
+  async verifyAndFulfillLocalPayment(sessionId) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (session.payment_status === 'paid') {
+        await this._handleSuccessfulPayment(session);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Manual fulfillment error:', err.message);
+      return false;
+    }
   }
 
   /**

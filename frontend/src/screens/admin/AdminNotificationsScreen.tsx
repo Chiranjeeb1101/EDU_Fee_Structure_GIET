@@ -29,78 +29,53 @@ export const AdminNotificationsScreen = () => {
 
   const generateNotifications = async () => {
     try {
-      // Fetch real data and generate smart notifications
-      const [stats, students] = await Promise.all([
+      // 1. Fetch real notifications from DB
+      const dbNotifications = await adminService.getNotifications().catch(() => []) || [];
+      
+      // 2. Fetch stats, students, and pending resets for smart summaries
+      const [statsRes, studentsRes, pendingResetsRes] = await Promise.allSettled([
         adminService.getAdminStats(),
         adminService.getStudents(),
+        import('../../services/resetService').then(m => m.default.getPendingRequests())
       ]);
 
-      const notifs: NotificationItem[] = [];
+      const stats = statsRes.status === 'fulfilled' ? statsRes.value : {};
+      const students = studentsRes.status === 'fulfilled' ? studentsRes.value || [] : [];
+      const pendingResets = pendingResetsRes.status === 'fulfilled' ? pendingResetsRes.value || [] : [];
 
-      // Students with dues
-      const studentsWithDues = students.filter((s: any) => Number(s.remaining_fee) > 0);
-      if (studentsWithDues.length > 0) {
-        notifs.push({
-          id: 'dues_summary',
-          title: 'Pending Fee Dues',
-          message: `${studentsWithDues.length} student(s) have pending fee dues totaling ₹${stats.total_pending?.toLocaleString() || 0}`,
-          type: 'due_reminder',
-          time: 'Today',
+      const notifs: NotificationItem[] = Array.isArray(dbNotifications) ? dbNotifications.map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        time: new Date(n.created_at).toLocaleDateString(),
+        read: n.is_read
+      })) : [];
+
+      // Smart Summary: Pending Password Resets
+      if (pendingResets.length > 0) {
+        notifs.unshift({
+          id: 'reset_requests_summary',
+          title: 'Password Reset Requests',
+          message: `You have ${pendingResets.length} pending password reset request(s) waiting for approval.`,
+          type: 'info',
+          time: 'Live',
           read: false,
         });
-
-        // Individual top due students
-        const topDues = studentsWithDues
-          .sort((a: any, b: any) => Number(b.remaining_fee) - Number(a.remaining_fee))
-          .slice(0, 3);
-        
-        topDues.forEach((s: any, idx: number) => {
-          notifs.push({
-            id: `due_${idx}`,
-            title: `${s.users?.full_name || 'Student'} - Fee Due`,
-            message: `₹${Number(s.remaining_fee).toLocaleString()} pending · ${s.course_type} ${s.stream} Year ${s.year}`,
-            type: 'due_reminder',
-            time: 'Action needed',
-            read: false,
-          });
-        });
       }
 
-      // Collection summary
-      if (stats.total_collected > 0) {
-        notifs.push({
-          id: 'collection',
-          title: 'Collection Summary',
-          message: `Total ₹${stats.total_collected.toLocaleString()} collected from ${stats.total_students} students.`,
-          type: 'payment',
-          time: 'This period',
-          read: true,
+      // Smart Summary: Pending Fee Dues
+      const studentsWithDues = Array.isArray(students) ? students.filter((s: any) => Number(s.remaining_fee) > 0) : [];
+      if (studentsWithDues.length > 0) {
+        notifs.unshift({
+          id: 'dues_summary',
+          title: 'Pending Fee Dues',
+          message: `${studentsWithDues.length} student(s) have pending fee dues totaling ₹${(stats?.total_pending || 0).toLocaleString()}`,
+          type: 'due_reminder',
+          time: 'Live',
+          read: false,
         });
       }
-
-      // Recent payments
-      if (stats.recent_payments?.length > 0) {
-        stats.recent_payments.slice(0, 3).forEach((p: any, idx: number) => {
-          notifs.push({
-            id: `payment_${idx}`,
-            title: 'Payment Received',
-            message: `₹${p.amount?.toLocaleString()} from ${p.students?.users?.full_name || 'Student'}`,
-            type: 'payment',
-            time: new Date(p.created_at).toLocaleDateString(),
-            read: true,
-          });
-        });
-      }
-
-      // New student count
-      notifs.push({
-        id: 'total_students',
-        title: 'Student Enrollment',
-        message: `${stats.total_students} students currently enrolled across ${stats.active_fee_structures} fee structures.`,
-        type: 'info',
-        time: 'Overview',
-        read: true,
-      });
 
       setNotifications(notifs);
     } catch (error) {

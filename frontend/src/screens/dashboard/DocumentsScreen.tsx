@@ -1,72 +1,119 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Dimensions, Platform, Modal, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Dimensions, Platform, Modal, Alert, ActivityIndicator, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import studentService from '../../services/studentService';
 import { colors } from '../../theme/colors';
 
 const { width } = Dimensions.get('window');
 
-const DocumentCard = ({ item, onPreview }: any) => (
+const DocumentCard = ({ item, onPreview, onDownload }: any) => (
   <TouchableOpacity style={styles.docCard} activeOpacity={0.8} onPress={() => onPreview(item)}>
     <View style={styles.docLeft}>
       <View style={styles.docIconWrapper}>
-        <MaterialIcons name={item.icon} size={36} color={colors.tertiary} />
-        {item.isNew && <View style={styles.docIconDot} />}
+        <MaterialIcons name={item.icon || 'description'} size={36} color={colors.tertiary} />
+        {item.is_verified && <View style={styles.docIconDot} />}
       </View>
       <View style={styles.docInfo}>
         <Text style={styles.docTitle} numberOfLines={1}>{item.title}</Text>
-        <View style={styles.docMetaRow}>
-          {item.isVerified && (
-            <View style={styles.verifiedBadge}>
-              <Text style={styles.verifiedText}>VERIFIED</Text>
-            </View>
-          )}
-          <Text style={styles.docMetaText}>{item.format} • {item.size}</Text>
-        </View>
+        <Text style={styles.docMetaText}>{item.format} • {item.size}</Text>
       </View>
     </View>
-    <TouchableOpacity style={styles.downloadBtn} onPress={() => Alert.alert('Download', `Downloading ${item.title}...`)}>
-      <MaterialIcons name="download" size={20} color="#000" />
+    <TouchableOpacity onPress={() => onDownload(item)} style={styles.downloadBtn}>
+      <MaterialIcons name="file-download" size={20} color={colors.primary} />
       <Text style={styles.downloadText}>Download</Text>
     </TouchableOpacity>
   </TouchableOpacity>
 );
 
-const MOCK_DOCS = [
-  { id: '1', title: "Semester 3 Marksheet", format: "PDF", size: "1.2 MB", icon: "description", isVerified: true, isNew: false },
-  { id: '2', title: "Bonafide Certificate", format: "PDF", size: "850 KB", icon: "verified-user", isVerified: false, isNew: true },
-  { id: '3', title: "Exam Registration Form", format: "PDF", size: "2.1 MB", icon: "edit-document", isVerified: false, isNew: true },
-];
-
 export const DocumentsScreen = () => {
   const navigation = useNavigation();
-  const [documents, setDocuments] = useState(MOCK_DOCS);
-  const [previewDoc, setPreviewDoc] = useState<any>(null);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
 
-  const handleUpload = () => {
-    Alert.alert(
-      "Upload Document",
-      "Select a document type to upload.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Upload ID Proof", 
-          onPress: () => {
-            const newDoc = {
-              id: Math.random().toString(),
-              title: "Student ID Proof",
-              format: "JPG",
-              size: "3.4 MB",
-              icon: "badge",
-              isVerified: false,
-              isNew: true
-            };
-            setDocuments([newDoc, ...documents]);
-            Alert.alert("Success", "Document uploaded successfully!");
-          }
-        }
-      ]
-    );
+  const loadDocuments = async () => {
+    try {
+      setLoading(true);
+      const data = await studentService.getDocuments();
+      setDocuments(data || []);
+    } catch (error: any) {
+      console.error("Failed to load documents", error);
+      // Optional: Alert.alert("Error", "Failed to get documents");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDocuments();
+  }, []);
+
+  const handleUpload = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploading(true);
+        const file = result.assets[0];
+        await studentService.uploadDocument(
+          file.uri, 
+          file.mimeType || 'application/octet-stream', 
+          file.name
+        );
+        Alert.alert("Success", "Document uploaded securely to vault.");
+        loadDocuments();
+      }
+    } catch (err: any) {
+      Alert.alert("Upload Failed", err.message || "Something went wrong.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDownload = async (doc: any) => {
+    try {
+      Alert.alert("Downloading", `Fetching ${doc.title}...`);
+      
+      // Sanitize the title to remove spaces and special characters for the local filesystem
+      let safeTitle = doc.title.replace(/[^a-zA-Z0-9.]/g, '_');
+      
+      // Ensure it has an extension
+      const format = doc.format.toLowerCase();
+      let ext = 'bin';
+      if (format.includes('pdf')) ext = 'pdf';
+      else if (format.includes('jpeg') || format.includes('jpg')) ext = 'jpg';
+      else if (format.includes('png')) ext = 'png';
+      else if (format.includes('doc')) ext = 'docx';
+      
+      if (!safeTitle.includes('.')) {
+        safeTitle = `${safeTitle}.${ext}`;
+      }
+
+      const fileUri = `${(FileSystem as any).documentDirectory}${safeTitle}`;
+      
+      const { uri, status } = await FileSystem.downloadAsync(doc.file_url, fileUri);
+      
+      if (status !== 200) {
+        throw new Error("Failed to download file from server.");
+      }
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { dialogTitle: 'Share or Save Document' });
+      } else {
+        Alert.alert("Saved", "File successfully saved to device.");
+      }
+    } catch (err: any) {
+      console.error("Download Error:", err);
+      Alert.alert("Download Error", err.message || "Could not download or share file.");
+    }
   };
 
   return (
@@ -83,8 +130,12 @@ export const DocumentsScreen = () => {
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Documents</Text>
             <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.iconBtn} onPress={handleUpload}>
-                <MaterialIcons name="file-upload" size={24} color={colors.tertiary} />
+              <TouchableOpacity style={styles.iconBtn} onPress={handleUpload} disabled={uploading}>
+                {uploading ? (
+                  <ActivityIndicator color={colors.tertiary} size="small" />
+                ) : (
+                  <MaterialIcons name="file-upload" size={24} color={colors.tertiary} />
+                )}
               </TouchableOpacity>
               <TouchableOpacity style={styles.iconBtn}>
                 <MaterialIcons name="search" size={24} color={colors.textSecondary} />
@@ -100,7 +151,9 @@ export const DocumentsScreen = () => {
           </View>
 
           <View style={styles.docList}>
-            {documents.length === 0 ? (
+            {loading ? (
+              <ActivityIndicator color={colors.primary} size="large" style={{ marginTop: 20 }} />
+            ) : documents.length === 0 ? (
               <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>No documents uploaded.</Text>
             ) : (
               documents.map(doc => (
@@ -108,6 +161,7 @@ export const DocumentsScreen = () => {
                   key={doc.id} 
                   item={doc}
                   onPreview={setPreviewDoc}
+                  onDownload={handleDownload}
                 />
               ))
             )}
@@ -142,23 +196,54 @@ export const DocumentsScreen = () => {
               </TouchableOpacity>
             </View>
 
-            {previewDoc && (
+            {previewDoc && (() => {
+              const format = previewDoc.format.toLowerCase();
+              const isImage = format.includes('image') || format.includes('jpg') || format.includes('jpeg') || format.includes('png');
+              
+              return (
               <View style={styles.previewBody}>
-                <MaterialIcons name={previewDoc.icon} size={80} color={colors.primary} style={{ marginBottom: 16 }} />
-                <Text style={styles.previewTitle}>{previewDoc.title}</Text>
-                <Text style={styles.previewMeta}>{previewDoc.format} • {previewDoc.size}</Text>
-                
-                {previewDoc.isVerified && (
-                  <View style={[styles.verifiedBadge, { marginTop: 12 }]}>
-                    <Text style={styles.verifiedText}>OFFICIALLY VERIFIED</Text>
+                {/* Content Render based on Format */}
+                {isImage ? (
+                  <Image 
+                    source={{ uri: previewDoc.file_url }} 
+                    style={{ width: '100%', height: 250, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' }} 
+                    resizeMode="contain" 
+                  />
+                ) : (
+                  <View style={{ alignItems: 'center' }}>
+                    <MaterialIcons name={previewDoc.icon} size={80} color={colors.primary} style={{ marginBottom: 16 }} />
+                    <View style={styles.previewPlaceholder}>
+                      <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center' }}>
+                        In-app preview applies only to images. Please use the device viewer to open this {previewDoc.format} file.
+                      </Text>
+                    </View>
                   </View>
                 )}
-                
-                <View style={styles.previewPlaceholder}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Preview not available for this format.</Text>
+
+                <View style={{ marginTop: 24, width: '100%', alignItems: 'center' }}>
+                  <Text style={styles.previewTitle}>{previewDoc.title}</Text>
+                  <Text style={styles.previewMeta}>{previewDoc.format} • {previewDoc.size}</Text>
+                  
+                  {previewDoc.is_verified && (
+                    <View style={[styles.verifiedBadge, { marginTop: 12 }]}>
+                      <Text style={styles.verifiedText}>OFFICIALLY VERIFIED</Text>
+                    </View>
+                  )}
+                  
+                  <TouchableOpacity 
+                    style={[styles.payNowBtn, { width: '100%', marginTop: 24, paddingVertical: 14 }]}
+                    onPress={() => {
+                      const doc = previewDoc;
+                      setPreviewDoc(null);
+                      handleDownload(doc);
+                    }}
+                  >
+                    <Text style={styles.payNowText}>DOWNLOAD TO VIEW</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-            )}
+              );
+            })()}
           </View>
         </View>
       </Modal>
@@ -424,5 +509,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 24,
+  },
+  payNowBtn: {
+    backgroundColor: '#316bf3',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  payNowText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
 });

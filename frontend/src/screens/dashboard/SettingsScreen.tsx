@@ -26,7 +26,7 @@ const SettingsItem = ({ icon, title, showToggle, toggleActive, onToggle, colorCl
 
 export const SettingsScreen = () => {
   const navigation = useNavigation();
-  const { logout, user } = useAuth(); // fetch user for display
+  const { logout, user, isBioEnabled, toggleBiometrics } = useAuth(); // fetch user for display
 
   // Toggle States
   const [reminders, setReminders] = React.useState(true);
@@ -100,7 +100,6 @@ export const SettingsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             await logout();
-            (navigation as any).reset({ index: 0, routes: [{ name: 'Welcome' }] });
           },
         },
       ]
@@ -202,6 +201,14 @@ export const SettingsScreen = () => {
               <SettingsItem icon="face" title="WhatsApp Notification" showToggle toggleActive={whatsapp} onToggle={toggleWhatsapp} />
               <View style={styles.divider} />
               <SettingsItem icon="lock" title="Change Password" onPress={() => (navigation as any).navigate('Security')} />
+              <View style={styles.divider} />
+              <SettingsItem 
+                icon="fingerprint" 
+                title="Biometric Security" 
+                showToggle 
+                toggleActive={isBioEnabled} 
+                onToggle={() => toggleBiometrics(!isBioEnabled)} 
+              />
               <View style={styles.divider} />
               <SettingsItem icon="verified-user" title="Two-Factor Auth" onPress={() => (navigation as any).navigate('Security')} />
             </View>

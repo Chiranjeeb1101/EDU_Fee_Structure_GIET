@@ -1,10 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Dimensions, Platform, LayoutAnimation, UIManager } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import studentService, { PaymentHistoryItem } from '../../services/studentService';
-import { ActivityIndicator, Alert } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, Linking } from 'react-native';
+import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -14,8 +17,8 @@ const FilterBadge = ({ label, active, onPress }: { label: string, active?: boole
   </TouchableOpacity>
 );
 
-const TransactionItem = ({ title, date, id, amount, status, icon, iconColor, statusColor }: any) => (
-  <View style={styles.transactionCard}>
+const TransactionItem = ({ title, date, id, amount, status, icon, iconColor, statusColor, onPress }: any) => (
+  <TouchableOpacity style={styles.transactionCard} onPress={onPress} activeOpacity={0.8}>
     <View style={styles.txLeft}>
       <View style={[styles.txIconBox, { backgroundColor: `${iconColor}1A`, borderColor: `${iconColor}33` }]}>
         <MaterialIcons name={icon} size={24} color={iconColor} />
@@ -32,7 +35,7 @@ const TransactionItem = ({ title, date, id, amount, status, icon, iconColor, sta
       </View>
     </View>
     <View style={[styles.cardAccentLine, { backgroundColor: iconColor }]} />
-  </View>
+  </TouchableOpacity>
 );
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -64,6 +67,7 @@ export const HistoryScreen = () => {
   const [activeFilter, setActiveFilter] = useState('All Fees');
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<PaymentHistoryItem[]>([]);
+  const [selectedTx, setSelectedTx] = useState<PaymentHistoryItem | null>(null);
 
   React.useEffect(() => {
     fetchHistory();
@@ -83,7 +87,7 @@ export const HistoryScreen = () => {
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
-      const matchesSearch = tx.razorpay_order_id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      const matchesSearch = (tx.stripe_checkout_session_id?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || 
                             tx.id.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesFilter = activeFilter === 'All Fees' || 
                             (activeFilter === 'Dues' && (tx.status === 'due' || tx.status === 'pending')) ||
@@ -95,6 +99,35 @@ export const HistoryScreen = () => {
   const handleFilterPress = (filter: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setActiveFilter(filter);
+  };
+
+  const { user, logout, token } = useAuth();
+
+  const totalPaid = useMemo(() => {
+    return transactions
+      .filter(tx => tx.status === 'paid' || tx.status === 'success' || tx.status === 'captured')
+      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+  }, [transactions]);
+
+  const handleDownload = async (receiptId: string) => {
+    try {
+      let currentToken = token;
+      if (!currentToken) {
+        currentToken = await AsyncStorage.getItem('auth_token');
+      }
+      
+      if (!currentToken) {
+        Alert.alert('Authentication Error', 'Could not verify your session. Please login again.');
+        return;
+      }
+
+      const url = `${api.defaults.baseURL}/payments/${receiptId}/receipt?token=${currentToken}`;
+      console.log('Downloading receipt from:', url);
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error('Receipt download error:', error);
+      Alert.alert('Error', 'Failed to open receipt download link.');
+    }
   };
 
   return (
@@ -165,7 +198,7 @@ export const HistoryScreen = () => {
                 return (
                   <TransactionItem 
                     key={tx.id}
-                    title={tx.razorpay_order_id ? `Order: ${tx.razorpay_order_id.substring(0, 10)}...` : 'Institutional Fee'}
+                    title={tx.stripe_checkout_session_id ? `Order: ${tx.stripe_checkout_session_id.substring(0, 10)}...` : 'Institutional Fee'}
                     date={new Date(tx.created_at).toLocaleDateString()} 
                     id={tx.id.substring(0, 8)} 
                     amount={tx.amount.toLocaleString()} 
@@ -173,6 +206,7 @@ export const HistoryScreen = () => {
                     icon={icon} 
                     iconColor={statusColor} 
                     statusColor={statusColor}
+                    onPress={() => setSelectedTx(tx)}
                   />
                 );
               })
@@ -183,7 +217,7 @@ export const HistoryScreen = () => {
           <View style={styles.summaryCard}>
             <View style={styles.summaryContent}>
               <Text style={styles.summaryLabel}>TOTAL FEE PAID (YEARLY)</Text>
-              <Text style={styles.summaryAmount}>₹1,200.00</Text>
+              <Text style={styles.summaryAmount}>₹{totalPaid.toLocaleString()}</Text>
             </View>
             <MaterialIcons name="analytics" size={48} color={colors.white} style={styles.summaryIcon} />
             <View style={styles.summaryGlow} />
@@ -191,6 +225,74 @@ export const HistoryScreen = () => {
 
         </ScrollView>
       </SafeAreaView>
+
+      {/* Transaction Detail Modal */}
+      <Modal
+        visible={!!selectedTx}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedTx(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Transaction Details</Text>
+              <TouchableOpacity onPress={() => setSelectedTx(null)} style={styles.modalCloseBtn}>
+                <MaterialIcons name="close" size={24} color={colors.white} />
+              </TouchableOpacity>
+            </View>
+            
+            {selectedTx && (
+              <ScrollView style={styles.modalBody}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Reference ID</Text>
+                  <Text style={styles.detailValue}>{selectedTx.id}</Text>
+                </View>
+                {selectedTx.stripe_checkout_session_id && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Stripe Session</Text>
+                    <Text style={styles.detailValue}>{selectedTx.stripe_checkout_session_id}</Text>
+                  </View>
+                )}
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Date</Text>
+                  <Text style={styles.detailValue}>{new Date(selectedTx.created_at).toLocaleString()}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Amount</Text>
+                  <Text style={[styles.detailValue, { color: colors.primary, fontSize: 18, fontWeight: '800' }]}>
+                    ₹{selectedTx.amount.toLocaleString()}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Status</Text>
+                  <View style={[styles.statusBadge, { 
+                    backgroundColor: selectedTx.status === 'paid' ? `${colors.success}33` : `${colors.warning}33`,
+                    borderColor: selectedTx.status === 'paid' ? colors.success : colors.warning,
+                    alignSelf: 'flex-end',
+                    paddingHorizontal: 8,
+                    paddingVertical: 4
+                  }]}>
+                    <Text style={[styles.statusText, { 
+                      color: selectedTx.status === 'paid' ? colors.success : colors.warning 
+                    }]}>{selectedTx.status}</Text>
+                  </View>
+                </View>
+
+                {/* Print button stub */}
+                <TouchableOpacity 
+                   style={styles.actionBtn} 
+                   onPress={() => handleDownload(selectedTx.id)}
+                >
+                  <MaterialIcons name="print" size={20} color={colors.white} />
+                  <Text style={styles.actionBtnText}>Download Receipt</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -400,5 +502,77 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     backgroundColor: 'rgba(144, 171, 255, 0.1)',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(9, 14, 28, 0.85)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#181f33',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  modalTitle: {
+    color: colors.white,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  modalCloseBtn: {
+    padding: 4,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+  },
+  modalBody: {
+    padding: 24,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  detailLabel: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  detailValue: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginTop: 32,
+    gap: 8,
+  },
+  actionBtnText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

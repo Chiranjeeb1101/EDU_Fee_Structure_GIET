@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Dimensions } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Dimensions, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -8,7 +8,22 @@ import { AdminGlowingBackground } from '../../components/layout/AdminGlowingBack
 import { useAuth } from '../../context/AuthContext';
 import adminService, { AdminStats } from '../../services/adminService';
 
+import resetService from '../../services/resetService';
+
 const { width } = Dimensions.get('window');
+
+const ResetBadge = ({ count, onPress }: { count: number; onPress: () => void }) => {
+  if (count === 0) return null;
+  return (
+    <TouchableOpacity style={styles.resetBadgeContainer} onPress={onPress}>
+      <View style={styles.resetBadgeGlow} />
+      <MaterialIcons name="lock-reset" size={20} color="#FF4D4D" />
+      <View style={styles.resetBadgeCounter}>
+        <Text style={styles.resetBadgeText}>{count}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const KPICard = ({ title, value, icon, color }: any) => (
   <View style={styles.kpiCard}>
@@ -34,6 +49,7 @@ export const AdminDashboardScreen = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [resetCount, setResetCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -41,16 +57,25 @@ export const AdminDashboardScreen = () => {
     }, [])
   );
 
+  useEffect(() => {
+    // Poll for stats (which now includes resets) every 30 seconds for "fast" updates
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchStats = async () => {
     try {
       const data = await adminService.getAdminStats();
       setStats(data);
+      setResetCount(data.pending_resets_count || 0);
     } catch (error) {
-      Alert.alert('Error', 'Failed to fetch admin stats');
+      console.warn('Stats fetch failed');
     } finally {
       setLoading(false);
     }
   };
+
+
 
   if (loading) {
     return (
@@ -72,7 +97,8 @@ export const AdminDashboardScreen = () => {
               <Text style={styles.greeting}>Welcome, Admin</Text>
               <Text style={styles.adminName}>{user?.full_name || 'Administrator'}</Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+              <ResetBadge count={resetCount} onPress={() => (navigation as any).navigate('AdminResetRequests')} />
               <TouchableOpacity style={styles.profileBadge} onPress={() => (navigation as any).navigate('AdminNotifications')}>
                 <MaterialIcons name="notifications" size={22} color={colors.adminPrimary} />
               </TouchableOpacity>
@@ -251,4 +277,46 @@ const styles = StyleSheet.create({
   txName: { color: colors.white, fontSize: 14, fontWeight: '600', marginBottom: 2 },
   txDate: { color: colors.textSecondary, fontSize: 11 },
   txAmount: { color: colors.success, fontSize: 16, fontWeight: '700' },
+  resetBadgeContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 77, 77, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 77, 77, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  resetBadgeGlow: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 77, 77, 0.2)',
+    shadowColor: '#FF4D4D',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+  },
+  resetBadgeCounter: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FF4D4D',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
+  resetBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
 });
+

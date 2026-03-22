@@ -3,18 +3,18 @@ const adminService = require('../services/admin.service');
 // ─── Fee Structures ─────────────────────────────────────────────
 
 exports.createFeeStructure = async (req, res) => {
-  const { course_type, stream, year, accommodation, total_fee, academic_year } = req.body;
+  const { title, course_type, stream, year, accommodation, total_fee, academic_year } = req.body;
   const adminCollegeId = req.user.college_id; // extracted by auth middleware
 
-  if (!course_type || !stream || !year || !accommodation || !total_fee || !academic_year) {
+  if (!title || !course_type || !stream || !year || !accommodation || !total_fee || !academic_year) {
     return res.status(400).json({
       success: false,
-      message: 'All fee structure fields are required (course_type, stream, year, accommodation, total_fee, academic_year)',
+      message: 'All fee structure fields are required (title, course_type, stream, year, accommodation, total_fee, academic_year)',
     });
   }
 
   const newFee = await adminService.createFeeStructure(adminCollegeId, {
-    course_type, stream, year, accommodation, total_fee, academic_year
+    title, course_type, stream, year, accommodation, total_fee, academic_year
   });
 
   res.status(201).json({
@@ -128,6 +128,26 @@ exports.getAllPayments = async (req, res) => {
   res.status(200).json({
     success: true,
     data: payments,
+  });
+};
+
+exports.getFeeMetadata = async (req, res) => {
+  const adminCollegeId = req.user.college_id;
+  const metadata = await adminService.getFeeMetadata(adminCollegeId);
+
+  res.status(200).json({
+    success: true,
+    data: metadata,
+  });
+};
+
+exports.getNotifications = async (req, res) => {
+  const userId = req.user.id;
+  const notifications = await adminService.getNotifications(userId);
+
+  res.status(200).json({
+    success: true,
+    data: notifications,
   });
 };
 

@@ -45,10 +45,18 @@ function sanitize(req, _res, next) {
   if (req.body && typeof req.body === 'object') {
     for (const key of Object.keys(req.body)) {
       if (typeof req.body[key] === 'string') {
-        req.body[key] = req.body[key]
-          .trim()
-          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-          .replace(/[<>]/g, '');
+        const value = req.body[key].trim();
+        // Skip stripping <> for base64/data URIs or specific profile picture fields 
+        // as they don't contain script tags but might have characters that shouldn't be blindly stripped
+        // although base64 doesn't use <>, some URI schemes might.
+        // The script tag removal below is the primary security measure.
+        if (key.includes('picture') || value.startsWith('data:')) {
+          req.body[key] = value.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+        } else {
+          req.body[key] = value
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            .replace(/[<>]/g, '');
+        }
       }
     }
   }

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, Anim
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { RootStackParamList } from '../../../App';
 import { GlowingBackground } from '../../components/layout/GlowingBackground';
 import { colors } from '../../theme/colors';
@@ -135,7 +136,6 @@ export const LoginScreen = () => {
     setIsLoading(true);
     try {
       let submitId = idValue.trim();
-      // If student, definitely uppercase. If admin email, lowercasing is safer, though backend does it.
       if (role === 'student' && !submitId.includes('@')) {
         submitId = submitId.toUpperCase();
       } else if (role === 'admin' && submitId.includes('@')) {
@@ -143,26 +143,63 @@ export const LoginScreen = () => {
       }
 
       const result = await login(submitId, passwordValue, rememberMe);
-      
-      if (result.success) {
-        if (role === 'student') {
-          (navigation as any).reset({
-            index: 0,
-            routes: [{ name: 'MainTabs', params: { screen: 'Dashboard' } }],
-          });
-        } else if (role === 'admin') {
-          (navigation as any).reset({
-            index: 0,
-            routes: [{ name: 'AdminTabs', params: { screen: 'Dashboard' } }],
-          });
-        }
-      } else {
+      // No manual reset needed - AuthContext state change handles navigation
+      if (!result.success) {
         setErrorMsg(result.message);
         triggerShake();
       }
     } catch (error: any) {
       setErrorMsg('Connection error. Please check your internet.');
       triggerShake();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ─── Biometric Login Handler ──────────────────────────────────────
+  const handleBiometricLogin = async () => {
+    try {
+      if (!role) {
+        setErrorMsg('Please select your role first');
+        return;
+      }
+
+      setIsLoading(true);
+      setErrorMsg('');
+
+      // 1. Check if biometrics is available
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !isEnrolled) {
+        Alert.alert('Not Available', 'Biometrics not set up on this device.');
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Authenticate
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: `Sign in as ${role === 'admin' ? 'Admin' : 'Student'}`,
+        fallbackLabel: 'Use Password',
+      });
+
+      if (result.success) {
+        // 3. Get saved credentials
+        const saved = await authService.getSavedCredentials();
+        if (saved && saved.role === role) {
+          // Automatic login
+          const loginResult = await login(saved.collegeId, saved.password, true);
+          // No manual reset needed - AuthContext state change handles navigation
+          if (!loginResult.success) {
+            setErrorMsg(loginResult.message);
+          }
+        } else {
+          Alert.alert('Reference Required', 'Please sign in with password once to enable biometric link.');
+        }
+      }
+    } catch (error) {
+      console.error('Bio login error:', error);
+      setErrorMsg('Biometric authentication failed');
     } finally {
       setIsLoading(false);
     }
@@ -312,21 +349,35 @@ export const LoginScreen = () => {
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity 
-                  style={[styles.loginBtn, { backgroundColor: isLoading ? `${activeColor}80` : activeColor }]} 
-                  activeOpacity={0.8}
-                  onPress={handleLogin}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <View style={styles.loadingRow}>
-                      <ActivityIndicator size="small" color={colors.white} />
-                      <Text style={[styles.loginBtnText, { marginLeft: 10 }]}>Logging in...</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.loginBtnText}>Login to Portal</Text>
-                  )}
-                </TouchableOpacity>
+                <View style={styles.actionRow}>
+                  <TouchableOpacity 
+                    style={[styles.loginBtn, { flex: 1, backgroundColor: isLoading ? `${activeColor}80` : activeColor }]} 
+                    activeOpacity={0.8}
+                    onPress={handleLogin}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <View style={styles.loadingRow}>
+                        <ActivityIndicator size="small" color={colors.white} />
+                        <Text style={[styles.loginBtnText, { marginLeft: 10 }]}>Wait..</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.loginBtnText}>Login Portal</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.bioLoginBtn, { borderColor: activeColor }]}
+                    onPress={handleBiometricLogin}
+                    disabled={isLoading}
+                  >
+                    <MaterialIcons 
+                      name={Platform.OS === 'ios' ? 'face' : 'fingerprint'} 
+                      size={28} 
+                      color={activeColor} 
+                    />
+                  </TouchableOpacity>
+                </View>
 
                 {role === 'student' && (
                   <View style={{ marginTop: 24, width: '100%' }}>
@@ -605,6 +656,21 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: '700',
     fontSize: 16,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+    width: '100%',
+  },
+  bioLoginBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   signupContainer: {
     flexDirection: 'row',

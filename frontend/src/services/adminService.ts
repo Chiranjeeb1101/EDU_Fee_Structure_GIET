@@ -6,6 +6,10 @@ export interface AdminStats {
   total_collected: number;
   total_pending: number;
   recent_payments: any[];
+  collection_by_stream: { name: string; amount: number }[];
+  monthly_revenue: { month: string; amount: number }[];
+  status_distribution: { success: number; pending: number; failed: number };
+  pending_resets_count: number;
 }
 
 class AdminService {
@@ -56,6 +60,16 @@ class AdminService {
 
   async getAllPayments() {
     const response = await api.get('/admin/payments');
+    return response.data.data;
+  }
+
+  async getFeeMetadata() {
+    const response = await api.get('/admin/fee-metadata');
+    return response.data.data;
+  }
+
+  async getNotifications() {
+    const response = await api.get('/admin/notifications');
     return response.data.data;
   }
 }

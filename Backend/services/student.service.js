@@ -22,7 +22,7 @@ class StudentService {
     // 2. Fetch all payment history for this student
     const { data: payments, error: paymentsError } = await supabase
       .from('payments')
-      .select('id, amount, status, razorpay_order_id, razorpay_payment_id, created_at')
+      .select('id, amount, status, stripe_checkout_session_id, stripe_payment_intent_id, created_at')
       .eq('student_id', student.id)
       .order('created_at', { ascending: false });
 
@@ -39,6 +39,75 @@ class StudentService {
       },
       payment_history: payments || [],
     };
+  }
+
+  async getNotifications(userId) {
+    const { data: notifications, error: notifError } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (notifError) {
+      throw Object.assign(new Error('Failed to fetch notifications.'), { statusCode: 500 });
+    }
+
+    return notifications;
+  }
+
+  async markNotificationRead(userId, notificationId) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId)
+      .eq('user_id', userId);
+
+    if (error) {
+      throw Object.assign(new Error('Failed to mark notification as read.'), { statusCode: 500 });
+    }
+    
+    return true;
+  }
+
+  // --- Document Methods ---
+  async getDocuments(userId) {
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('user_id', userId)
+      .order('upload_date', { ascending: false });
+
+    if (error) {
+      throw Object.assign(new Error('Failed to fetch documents.'), { statusCode: 500 });
+    }
+    return data;
+  }
+
+  async addDocument(userId, docData) {
+    const { title, format, size, file_url, icon } = docData;
+    const { data, error } = await supabase
+      .from('documents')
+      .insert([{ user_id: userId, title, format, size, file_url, icon }])
+      .select()
+      .single();
+
+    if (error) {
+      throw Object.assign(new Error('Failed to save document records.'), { statusCode: 500 });
+    }
+    return data;
+  }
+
+  async deleteDocument(userId, documentId) {
+    const { error } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', documentId)
+      .eq('user_id', userId);
+
+    if (error) {
+      throw Object.assign(new Error('Failed to delete document.'), { statusCode: 500 });
+    }
+    return true;
   }
 }
 

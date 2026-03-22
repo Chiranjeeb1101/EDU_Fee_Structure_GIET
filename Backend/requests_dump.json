@@ -1,0 +1,23 @@
+[
+  {
+    "id": "968be6c2-0f7a-499f-bc3c-ddcbba7eae92",
+    "status": "approved",
+    "created_at": "2026-03-21T17:12:11.15526+00:00",
+    "student_id": "7ea0ec22-5418-4d31-a76d-aba657ad1808",
+    "college_id": "ce5b6a28-e26a-47c8-8aba-3049e9ce5e90"
+  },
+  {
+    "id": "456dde52-ea62-48c2-956f-7263374d91fc",
+    "status": "approved",
+    "created_at": "2026-03-21T17:10:58.107127+00:00",
+    "student_id": "7ea0ec22-5418-4d31-a76d-aba657ad1808",
+    "college_id": "ce5b6a28-e26a-47c8-8aba-3049e9ce5e90"
+  },
+  {
+    "id": "4bb42002-1206-4d9a-8042-f4fc4af5a468",
+    "status": "rejected",
+    "created_at": "2026-03-21T16:50:38.495166+00:00",
+    "student_id": "7ea0ec22-5418-4d31-a76d-aba657ad1808",
+    "college_id": "ce5b6a28-e26a-47c8-8aba-3049e9ce5e90"
+  }
+]

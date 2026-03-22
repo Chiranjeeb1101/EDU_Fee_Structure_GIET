@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Dimensions, Platform, LayoutAnimation, UIManager } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Dimensions, Platform, LayoutAnimation, UIManager, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
@@ -33,9 +33,10 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 export const CalendarScreen = () => {
   const navigation = useNavigation();
   
-  // States handling month and selected day. Initializing to August 2026
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 7, 15));
-  const [selectedDay, setSelectedDay] = useState<number | null>(15);
+  // States handling month and selected day. Initializing to Current real Date
+  const today = new Date();
+  const [currentDate, setCurrentDate] = useState(today);
+  const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate());
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year: number, month: number) => {
@@ -73,6 +74,23 @@ export const CalendarScreen = () => {
   const handleDayPress = (day: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
     setSelectedDay(day);
+  };
+
+  const handleSetReminder = () => {
+    if (!selectedDay) return;
+    
+    Alert.alert(
+      "Reminder Scheduled", 
+      `An in-app reminder has been set for ${selectedDay} ${monthStr}. (Demo: It will pop up in 5 seconds)`
+    );
+
+    // Simulate a reminder popping up after 5 seconds since Expo Go cannot use native push notifications anymore
+    setTimeout(() => {
+      Alert.alert(
+        "⏰ REMINDER ALARM", 
+        `Hey! This is your scheduled reminder for the event on ${selectedDay} ${monthStr} ${year}.`
+      );
+    }, 5000);
   };
 
   return (
@@ -121,8 +139,8 @@ export const CalendarScreen = () => {
             <View style={styles.daysGrid}>
               {prevDays.map(d => <CalendarDay key={`p-${d}`} day={d.toString()} isPrevMonth />)}
               {currDays.map(d => {
-                // Mocking some critical days and info days
-                const isCritical = (d === 15 && monthIndex === 7); // Aug 15th
+                // Mocking some critical days and info days. We'll mark the 15th as critical as an example
+                const isCritical = (d === 15); 
                 return (
                   <CalendarDay 
                     key={`c-${d}`} 
@@ -153,27 +171,22 @@ export const CalendarScreen = () => {
                   <View style={styles.detailsCardTop}>
                     <View>
                       <Text style={styles.cardLabel}>CATEGORY</Text>
-                      <Text style={styles.cardValTitle}>{selectedDay === 15 && monthIndex === 7 ? 'Pending Due' : 'No Events'}</Text>
+                      <Text style={styles.cardValTitle}>{selectedDay === 15 ? 'Pending Due' : 'Scheduled Task'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={styles.cardLabel}>AMOUNT</Text>
-                      <Text style={styles.cardValAmount}>{selectedDay === 15 && monthIndex === 7 ? '₹15,000' : '—'}</Text>
+                      <Text style={styles.cardValAmount}>{selectedDay === 15 ? '₹15,000' : '—'}</Text>
                     </View>
                   </View>
 
-                  {selectedDay === 15 && monthIndex === 7 && (
-                    <View style={styles.detailsCardActions}>
-                      <TouchableOpacity style={styles.payNowBtn}>
-                        <Text style={styles.payNowText}>PAY NOW</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.actionCircleBtn}>
-                        <MaterialIcons name="notifications" size={20} color={colors.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.actionCircleBtn}>
-                        <MaterialIcons name="chat" size={20} color={colors.tertiary} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                  <View style={styles.detailsCardActions}>
+                    <TouchableOpacity style={styles.payNowBtn} onPress={handleSetReminder}>
+                      <Text style={styles.payNowText}>SET REMINDER</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionCircleBtn}>
+                      <MaterialIcons name="event" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
                </View>
             </View>
           ) : (
@@ -190,7 +203,7 @@ export const CalendarScreen = () => {
             </View>
             <View>
               <Text style={styles.alertSub}>NEXT PAYMENT CYCLE</Text>
-              <Text style={styles.alertTitle}>October 01, 2026</Text>
+              <Text style={styles.alertTitle}>Check Notifications</Text>
             </View>
           </View>
 

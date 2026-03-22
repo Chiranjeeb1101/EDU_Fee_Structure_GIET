@@ -84,6 +84,9 @@ export const ProfileScreen = () => {
   const [editName, setEditName] = useState(user?.full_name || '');
   const [editEmail, setEditEmail] = useState(user?.personal_email || user?.email || '');
   const [editPhone, setEditPhone] = useState(user?.student_phone || '');
+  const [editRegNo, setEditRegNo] = useState(user?.registration_number || '');
+  const [editParentName, setEditParentName] = useState(user?.parent_name || '');
+  const [editParentWhatsapp, setEditParentWhatsapp] = useState(user?.parent_whatsapp || '');
   const [editImage, setEditImage] = useState<string | null>(null);
   const [editImageBase64, setEditImageBase64] = useState<string | null>(null);
 
@@ -113,6 +116,9 @@ export const ProfileScreen = () => {
         full_name: editName,
         personal_email: editEmail,
         student_phone: editPhone,
+        registration_number: editRegNo,
+        parent_name: editParentName,
+        parent_whatsapp: editParentWhatsapp,
         profile_picture: editImageBase64 || undefined
       });
 
@@ -142,7 +148,7 @@ export const ProfileScreen = () => {
           style: 'destructive',
           onPress: async () => {
             await logout();
-            (navigation as any).reset({ index: 0, routes: [{ name: 'Welcome' }] });
+            // No manual reset needed - AuthContext state change handles navigation
           },
         },
       ]
@@ -167,6 +173,27 @@ export const ProfileScreen = () => {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
+          {/* Profile Completion Warning */}
+          {user?.profile_complete === false && (
+            <TouchableOpacity 
+              style={styles.warningCard} 
+              onPress={() => setEditModalVisible(true)}
+              activeOpacity={0.9}
+            >
+              <View style={styles.warningHeader}>
+                <MaterialIcons name="error-outline" size={20} color={colors.error} />
+                <Text style={styles.warningTitle}>Profile Incomplete</Text>
+              </View>
+              <Text style={styles.warningText}>
+                Please provide your Registration Number and Parent details to unlock fee payments.
+              </Text>
+              <View style={styles.warningAction}>
+                <Text style={styles.warningActionText}>COMPUTE PROFILE NOW</Text>
+                <MaterialIcons name="chevron-right" size={16} color={colors.error} />
+              </View>
+            </TouchableOpacity>
+          )}
+
           {/* Profile Header */}
           <View style={styles.profileSection}>
             <TouchableOpacity style={styles.avatarWrapper} onPress={pickImage}>
@@ -183,6 +210,7 @@ export const ProfileScreen = () => {
             </TouchableOpacity>
             <Text style={styles.profileName}>{user?.full_name || 'Alex Rivera'}</Text>
             <Text style={styles.profileId}>Registration ID: {user?.college_id_number || '2026-XXXX-XXXX'}</Text>
+            <Text style={styles.profileEmail}>{user?.personal_email || user?.email || ''}</Text>
           </View>
 
           {/* Settings List */}
@@ -190,7 +218,7 @@ export const ProfileScreen = () => {
             <ProfileListItem 
               icon="person" 
               title="Edit Personal Details" 
-              subtitle="Name, Email, Phone, Address"
+              subtitle="Identity, Contact & Parent info"
               colorClass="rgba(144, 171, 255, 0.1)" // primary dim
               onPress={() => setEditModalVisible(true)}
             />
@@ -310,6 +338,24 @@ export const ProfileScreen = () => {
                 <TextInput style={styles.input} value={editPhone} onChangeText={setEditPhone} placeholder="+1 (555) 000-0000" placeholderTextColor="rgba(255,255,255,0.3)" keyboardType="phone-pad" />
               </View>
 
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>REGISTRATION NUMBER</Text>
+                <TextInput style={styles.input} value={editRegNo} onChangeText={setEditRegNo} placeholder="2024CSE001" placeholderTextColor="rgba(255,255,255,0.3)" />
+              </View>
+
+              <View style={styles.divider} />
+              <Text style={styles.sectionLabel}>PARENT / GUARDIAN INFO</Text>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>PARENT FULL NAME</Text>
+                <TextInput style={styles.input} value={editParentName} onChangeText={setEditParentName} placeholder="Guardian Name" placeholderTextColor="rgba(255,255,255,0.3)" />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>PARENT WHATSAPP</Text>
+                <TextInput style={styles.input} value={editParentWhatsapp} onChangeText={setEditParentWhatsapp} placeholder="+1 (555) 000-0000" placeholderTextColor="rgba(255,255,255,0.3)" keyboardType="phone-pad" />
+              </View>
+
               <TouchableOpacity 
                 style={[styles.saveBtn, (isUpdating || !editName.trim()) && { opacity: 0.7 }]} 
                 onPress={handleSaveProfile}
@@ -418,6 +464,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 2,
+    marginTop: 4,
+  },
+  profileEmail: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '500',
     marginTop: 4,
   },
   modalOverlay: {
@@ -636,5 +688,47 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 14,
     fontWeight: '600',
+  },
+  warningCard: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 32,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  warningTitle: {
+    color: colors.error,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  warningText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  warningAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  warningActionText: {
+    color: colors.error,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginVertical: 20,
   },
 });

@@ -62,20 +62,34 @@ CREATE TABLE IF NOT EXISTS students (
 CREATE TABLE IF NOT EXISTS fee_structures (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   college_id      UUID NOT NULL REFERENCES colleges(id) ON DELETE CASCADE,
+  title           TEXT NOT NULL,                    -- Added: e.g. "Tution Fee"
   course_type     TEXT NOT NULL,
   stream          TEXT NOT NULL,
   year            INTEGER NOT NULL,
-  accommodation   TEXT NOT NULL CHECK (accommodation IN ('hosteler', 'day_scholar')),
+  accommodation   TEXT NOT NULL CHECK (accommodation IN ('hosteler', 'day_scholar', 'both')), -- Added 'both' for generic fees
   total_fee       NUMERIC(12,2) NOT NULL,
   academic_year   TEXT NOT NULL,                    -- e.g. "2025-26"
   created_at      TIMESTAMPTZ DEFAULT now(),
 
-  -- Prevent duplicate fee rules
-  UNIQUE (college_id, course_type, stream, year, accommodation, academic_year)
+  -- Prevent duplicate fee rules (now includes title)
+  UNIQUE (college_id, course_type, stream, year, accommodation, academic_year, title)
 );
 
 -- ────────────────────────────────────────────────────────────
--- 5. PAYMENTS
+-- 5. NOTIFICATIONS
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS notifications (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title           TEXT NOT NULL,
+  message         TEXT NOT NULL,
+  type            TEXT DEFAULT 'info',              -- info, warning, success
+  is_read         BOOLEAN DEFAULT false,
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- ────────────────────────────────────────────────────────────
+-- 6. PAYMENTS
 -- ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS payments (
   id                           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -97,7 +111,7 @@ CREATE INDEX IF NOT EXISTS idx_users_college_id     ON users(college_id);
 CREATE INDEX IF NOT EXISTS idx_students_college_id  ON students(college_id);
 CREATE INDEX IF NOT EXISTS idx_students_user_id     ON students(user_id);
 CREATE INDEX IF NOT EXISTS idx_fee_structures_lookup
-  ON fee_structures(college_id, course_type, stream, year, accommodation, academic_year);
+  ON fee_structures(college_id, course_type, stream, year, accommodation, academic_year, title);
 CREATE INDEX IF NOT EXISTS idx_payments_student_id  ON payments(student_id);
 CREATE INDEX IF NOT EXISTS idx_payments_college_id  ON payments(college_id);
 CREATE INDEX IF NOT EXISTS idx_payments_stripe_session  ON payments(stripe_checkout_session_id);
@@ -112,6 +126,7 @@ ALTER TABLE users          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE students       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fee_structures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications  ENABLE ROW LEVEL SECURITY;
 
 -- ── Helper: get the current user's row from the users table ─
 -- (used inside policies to check role & college_id)
@@ -234,6 +249,29 @@ CREATE POLICY "fee_structures_delete_admin"
   USING (
     get_current_user_role() = 'admin'
     AND college_id = get_current_user_college_id()
+  );
+
+-- ── NOTIFICATIONS policies ────────────────────────────────
+-- Users can read their own notifications
+CREATE POLICY "notifications_select_own"
+  ON notifications FOR SELECT
+  TO authenticated
+  USING (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()));
+
+-- Users can update their own notifications (to mark as read)
+CREATE POLICY "notifications_update_own"
+  ON notifications FOR UPDATE
+  TO authenticated
+  USING (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()))
+  WITH CHECK (user_id = (SELECT id FROM users WHERE auth_id = auth.uid()));
+
+-- Admins can create notifications for any user in their college
+CREATE POLICY "notifications_insert_admin"
+  ON notifications FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    get_current_user_role() = 'admin'
+    AND (SELECT college_id FROM users WHERE id = user_id) = get_current_user_college_id()
   );
 
 -- ── PAYMENTS policies ──────────────────────────────────────

@@ -8,10 +8,12 @@ import { RootStackParamList } from '../../../App';
 import { GlowingBackground } from '../../components/layout/GlowingBackground';
 import { colors } from '../../theme/colors';
 import authService, { RegisterPayload } from '../../services/authService';
+import { useAuth } from '../../context/AuthContext';
 
 export const RegisterScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [residency, setResidency] = useState<'hosteller' | 'day-scholar'>('hosteller');
+  const { register } = useAuth();
+  const [residency, setResidency] = useState<'hosteler' | 'day_scholar'>('hosteler');
   const [isPasswordVisible, setPasswordVisible] = useState(false);
 
   // New States for Interactivity
@@ -163,17 +165,18 @@ export const RegisterScreen = () => {
         course_type: course,
         stream: branch,
         year,
-        accommodation: residency === 'hosteller' ? 'hosteler' : 'day_scholar', // Map to DB enum
+        accommodation: residency, // Already standardized to DB enum
         student_phone: studentPhone.trim() || undefined,
         parent_name: parentName.trim() || undefined,
         parent_whatsapp: parentWhatsapp.trim() || undefined,
       };
 
-      const result = await authService.register(payload);
+      const result = await register(payload);
       if (result.success) {
         navigation.navigate('RegistrationSuccess', { 
           user: result.data.user,
-          student: result.data.student 
+          student: result.data.student,
+          token: result.data.token
         });
       } else {
         setErrorMsg(result.message);
@@ -300,16 +303,16 @@ export const RegisterScreen = () => {
                   <Text style={styles.inputLabel}>RESIDENCY TYPE</Text>
                   <View style={styles.toggleContainer}>
                     <TouchableOpacity 
-                      style={[styles.toggleBtn, residency === 'hosteller' && styles.toggleBtnActive]}
-                      onPress={() => setResidency('hosteller')}
+                      style={[styles.toggleBtn, residency === 'hosteler' && styles.toggleBtnActive]}
+                      onPress={() => setResidency('hosteler')}
                     >
-                      <Text style={[styles.toggleText, residency === 'hosteller' && styles.toggleTextActive]}>HOSTELLER</Text>
+                      <Text style={[styles.toggleText, residency === 'hosteler' && styles.toggleTextActive]}>HOSTELLER</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                      style={[styles.toggleBtn, residency === 'day-scholar' && styles.toggleBtnActive]}
-                      onPress={() => setResidency('day-scholar')}
+                      style={[styles.toggleBtn, residency === 'day_scholar' && styles.toggleBtnActive]}
+                      onPress={() => setResidency('day_scholar')}
                     >
-                      <Text style={[styles.toggleText, residency === 'day-scholar' && styles.toggleTextActive]}>DAY SCHOLAR</Text>
+                      <Text style={[styles.toggleText, residency === 'day_scholar' && styles.toggleTextActive]}>DAY SCHOLAR</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

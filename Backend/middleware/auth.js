@@ -6,15 +6,16 @@ const supabase = require('../config/supabase');
 exports.authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    const queryToken = req.query.token; // Support tokens in query string for downloads
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader && !queryToken) {
       return res.status(401).json({
         success: false,
         message: 'No token provided. Authorization denied.',
       });
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader ? authHeader.split(' ')[1] : queryToken;
 
     // 1. Verify token with Supabase Auth
     const {
@@ -23,6 +24,7 @@ exports.authenticate = async (req, res, next) => {
     } = await supabase.auth.getUser(token);
 
     if (authError || !authUser) {
+      console.error('Auth verification failed:', authError?.message || 'No user found');
       return res.status(401).json({
         success: false,
         message: 'Invalid or expired token.',

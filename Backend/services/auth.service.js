@@ -3,6 +3,30 @@ const { createClient } = require('@supabase/supabase-js');
 
 class AuthService {
   /**
+   * Internal helper to normalize academic fields for DB matching.
+   */
+  normalizeAcademicDetails(course_type, stream, year, accommodation) {
+    const normalizedYear = year ? parseInt(year.toString().replace(/\D/g, ''), 10) : null;
+    let normalizedAccommodation = accommodation ? accommodation.toLowerCase().trim() : null;
+    
+    // Map common spelling variations to DB enum: 'hosteler', 'day_scholar'
+    if (normalizedAccommodation) {
+      if (normalizedAccommodation.includes('hosteller') || normalizedAccommodation === 'hostel') {
+        normalizedAccommodation = 'hosteler';
+      } else if (normalizedAccommodation.includes('day-scholar') || normalizedAccommodation === 'day scholar') {
+        normalizedAccommodation = 'day_scholar';
+      }
+    }
+
+    return {
+      course_type: course_type?.trim(),
+      stream: stream?.trim(),
+      year: normalizedYear,
+      accommodation: normalizedAccommodation
+    };
+  }
+
+  /**
    * Register a new student (Usually done by Admin)
    * We generate a dummy email based on college_id_number because
    * Supabase Auth requires an email, but users will log in via college_id_number.
@@ -80,13 +104,62 @@ class AuthService {
       .single();
 
     if (studentError) {
-      // Rollback Auth user (cascade should delete `users` row)
       await supabase.auth.admin.deleteUser(authId);
       throw Object.assign(new Error(`Failed to create student record: ${studentError.message}`), { statusCode: 500 });
     }
 
+    // 5. Automatically Sync Fees if details are provided
+    if (course_type && stream && year && accommodation) {
+      const normalized = this.normalizeAcademicDetails(course_type, stream, year, accommodation);
+      
+      // Select ALL matching components for this student (e.g. Tuition + Hostel)
+      const { data: feeComponents } = await supabase
+        .from('fee_structures')
+        .select('total_fee')
+        .eq('college_id', targetCollegeId)
+        .eq('course_type', normalized.course_type)
+        .eq('stream', normalized.stream)
+        .eq('year', normalized.year)
+        .eq('accommodation', normalized.accommodation);
+
+      if (feeComponents && feeComponents.length > 0) {
+        const totalFee = feeComponents.reduce((sum, item) => sum + Number(item.total_fee), 0);
+        
+        await supabase
+          .from('students')
+          .update({ 
+            total_fee: totalFee, 
+            remaining_fee: totalFee,
+            profile_complete: true 
+          })
+          .eq('id', newStudent.id);
+        
+        // Update the local object for response
+        newStudent.total_fee = totalFee;
+        newStudent.remaining_fee = totalFee;
+        newStudent.profile_complete = true;
+      }
+    }
+
+    // 6. Generate Token for the new user (Self-Login)
+    const tempClient = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY,
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    );
+
+    const { data: signInData } = await tempClient.auth.signInWithPassword({
+      email: generatedEmail,
+      password: password,
+    });
+
     return {
-      user: newUser,
+      token: signInData?.session?.access_token || null,
+      user: {
+        ...newUser,
+        college_id_number, // Include this for frontend mapping
+        profile_complete: newStudent.profile_complete,
+      },
       student: newStudent,
     };
   }
@@ -132,10 +205,13 @@ class AuthService {
       return {
         token: authData.session.access_token,
         user: {
+          id: adminUser.id,
+          email: adminUser.email,
           full_name: adminUser.full_name,
           role: adminUser.role,
           college_id_number: adminUser.email,
           college_id: adminUser.college_id,
+          profile_picture: adminUser.profile_picture,
           profile_complete: true,
         },
       };
@@ -145,7 +221,7 @@ class AuthService {
     // 1. Lookup student to ensure they exist and get user_id
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('user_id, profile_complete')
+      .select('user_id, profile_complete, student_phone, stream, course_type, accommodation, year, registration_number')
       .eq('college_id_number', college_id_number)
       .eq('college_id', targetCollegeId)
       .single();
@@ -157,7 +233,7 @@ class AuthService {
     // 2. Fetch artificial email from `users` table
     const { data: dbUser, error: userError } = await supabase
       .from('users')
-      .select('email, role, full_name')
+      .select('id, email, role, full_name, profile_picture, personal_email')
       .eq('id', student.user_id)
       .single();
 
@@ -184,10 +260,20 @@ class AuthService {
     return {
       token: authData.session.access_token,
       user: {
+        id: dbUser.id,
+        email: dbUser.email,
         full_name: dbUser.full_name,
         role: dbUser.role,
         college_id_number,
+        profile_picture: dbUser.profile_picture,
         profile_complete: student.profile_complete,
+        personal_email: student.personal_email || dbUser.personal_email,
+        student_phone: student.student_phone,
+        stream: student.stream,
+        course_type: student.course_type,
+        accommodation: student.accommodation,
+        year: student.year,
+        registration_number: student.registration_number,
       },
     };
   }
@@ -214,34 +300,35 @@ class AuthService {
       throw Object.assign(new Error('Profile is already complete.'), { statusCode: 400 });
     }
 
-    // 2. Lookup appropriate fee structure
-    const { data: feeStructure, error: feeError } = await supabase
+    // 2. Lookup appropriate fee structure components
+    const normalized = this.normalizeAcademicDetails(course_type, stream, year, accommodation);
+    
+    const { data: feeComponents, error: feeError } = await supabase
       .from('fee_structures')
       .select('total_fee')
       .eq('college_id', student.college_id)
-      .eq('course_type', course_type)
-      .eq('stream', stream)
-      .eq('year', year)
-      .eq('accommodation', accommodation)
-      .eq('academic_year', academic_year)
-      .single();
+      .eq('course_type', normalized.course_type)
+      .eq('stream', normalized.stream)
+      .eq('year', normalized.year)
+      .eq('accommodation', normalized.accommodation)
+      .eq('academic_year', academic_year);
 
-    if (feeError || !feeStructure) {
+    if (feeError || !feeComponents || feeComponents.length === 0) {
       throw Object.assign(new Error('No matching fee structure found for these details.'), { statusCode: 404 });
     }
 
-    const totalFee = feeStructure.total_fee;
+    const totalFee = feeComponents.reduce((sum, item) => sum + Number(item.total_fee), 0);
 
     // 3. Update student record
     const { data: updatedStudent, error: updateError } = await supabase
       .from('students')
       .update({
-        course_type,
-        stream,
-        year,
-        accommodation,
+        course_type: normalized.course_type,
+        stream: normalized.stream,
+        year: normalized.year,
+        accommodation: normalized.accommodation,
         total_fee: totalFee,
-        remaining_fee: totalFee, // Initially, remaining = total
+        remaining_fee: totalFee,
         profile_complete: true,
       })
       .eq('id', student.id)
@@ -299,7 +386,7 @@ class AuthService {
   async updateProfile(userId, updateData) {
     const { 
       full_name, personal_email, profile_picture,
-      student_phone, parent_name, parent_whatsapp
+      registration_number, student_phone, parent_name, parent_whatsapp
     } = updateData;
 
     // 1. Update `users` table
@@ -319,11 +406,32 @@ class AuthService {
 
     // 2. Update `students` table
     const studentUpdates = {};
+    if (registration_number !== undefined) studentUpdates.registration_number = registration_number;
     if (student_phone !== undefined) studentUpdates.student_phone = student_phone;
     if (parent_name !== undefined) studentUpdates.parent_name = parent_name;
     if (parent_whatsapp !== undefined) studentUpdates.parent_whatsapp = parent_whatsapp;
 
     if (Object.keys(studentUpdates).length > 0) {
+      // Fetch current student for "profile_complete" check
+      const { data: currentStudent } = await supabase
+        .from('students')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (currentStudent) {
+        // Evaluate completeness: use existing values as fallback for missing fields in current update
+        const finalReg = studentUpdates.registration_number ?? currentStudent.registration_number;
+        const finalPhone = studentUpdates.student_phone ?? currentStudent.student_phone;
+        const finalPName = studentUpdates.parent_name ?? currentStudent.parent_name;
+        const finalPWa = studentUpdates.parent_whatsapp ?? currentStudent.parent_whatsapp;
+
+        if (finalReg && finalPhone && finalPName && finalPWa) {
+          studentUpdates.profile_complete = true;
+          console.log(`✅ Profile completed for user: ${userId}`);
+        }
+      }
+
       const { error: studentError } = await supabase
         .from('students')
         .update(studentUpdates)

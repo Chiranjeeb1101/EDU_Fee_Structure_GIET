@@ -2,16 +2,17 @@ const supabase = require('../config/supabase');
 
 class AdminService {
   /**
-   * Create a new fee structure for the admin's college
+   * Create a new fee structure and sync affected students
    */
   async createFeeStructure(adminCollegeId, data) {
-    const { course_type, stream, year, accommodation, total_fee, academic_year } = data;
+    const { title, course_type, stream, year, accommodation, total_fee, academic_year } = data;
 
     const { data: newFee, error } = await supabase
       .from('fee_structures')
       .insert([
         {
           college_id: adminCollegeId,
+          title,
           course_type,
           stream,
           year,
@@ -25,10 +26,13 @@ class AdminService {
 
     if (error) {
       if (error.code === '23505') {
-        throw Object.assign(new Error('A fee structure for these exact parameters already exists.'), { statusCode: 409 });
+        throw Object.assign(new Error('A fee structure with this title already exists for these parameters.'), { statusCode: 409 });
       }
       throw Object.assign(new Error(`Failed to create fee structure: ${error.message}`), { statusCode: 500 });
     }
+
+    // Trigger sync for matching students
+    await this.syncStudentFees(adminCollegeId, { course_type, stream, year, accommodation });
 
     return newFee;
   }
@@ -51,14 +55,21 @@ class AdminService {
   }
 
   /**
-   * Update an existing fee structure
+   * Update an existing fee structure and sync affected students
    */
   async updateFeeStructure(adminCollegeId, feeId, updates) {
+    // We need old data to know who to sync
+    const { data: oldFee } = await supabase
+      .from('fee_structures')
+      .select('*')
+      .eq('id', feeId)
+      .single();
+
     const { data, error } = await supabase
       .from('fee_structures')
       .update(updates)
       .eq('id', feeId)
-      .eq('college_id', adminCollegeId) // Ensure they only update their own college
+      .eq('college_id', adminCollegeId)
       .select()
       .single();
 
@@ -70,18 +81,41 @@ class AdminService {
       throw Object.assign(new Error('Fee structure not found or unauthorized.'), { statusCode: 404 });
     }
 
+    // Sync students for both old and new criteria (if they changed)
+    await this.syncStudentFees(adminCollegeId, { 
+      course_type: data.course_type, 
+      stream: data.stream, 
+      year: data.year, 
+      accommodation: data.accommodation 
+    });
+    
+    if (oldFee && (oldFee.course_type !== data.course_type || oldFee.stream !== data.stream || oldFee.year !== data.year || oldFee.accommodation !== data.accommodation)) {
+      await this.syncStudentFees(adminCollegeId, { 
+        course_type: oldFee.course_type, 
+        stream: oldFee.stream, 
+        year: oldFee.year, 
+        accommodation: oldFee.accommodation 
+      });
+    }
+
     return data;
   }
 
   /**
-   * Delete a fee structure
+   * Delete a fee structure and sync affected students
    */
   async deleteFeeStructure(adminCollegeId, feeId) {
+    const { data: feeToDelete } = await supabase
+      .from('fee_structures')
+      .select('*')
+      .eq('id', feeId)
+      .single();
+
     const { data, error } = await supabase
       .from('fee_structures')
       .delete()
       .eq('id', feeId)
-      .eq('college_id', adminCollegeId) // Ensure they only delete their own college
+      .eq('college_id', adminCollegeId)
       .select()
       .single();
 
@@ -93,7 +127,125 @@ class AdminService {
       throw Object.assign(new Error('Fee structure not found or unauthorized.'), { statusCode: 404 });
     }
 
+    if (feeToDelete) {
+      await this.syncStudentFees(adminCollegeId, { 
+        course_type: feeToDelete.course_type, 
+        stream: feeToDelete.stream, 
+        year: feeToDelete.year, 
+        accommodation: feeToDelete.accommodation 
+      });
+    }
+
     return true;
+  }
+
+  /**
+   * Recalculates total_fee and remaining_fee for students matching specific criteria
+   */
+  async syncStudentFees(adminCollegeId, criteria) {
+    const { course_type, stream, year } = criteria;
+
+    // 1. Get all students matching the basic criteria
+    const { data: students, error: studentError } = await supabase
+      .from('students')
+      .select('id, accommodation, paid_fee')
+      .eq('college_id', adminCollegeId)
+      .eq('course_type', course_type)
+      .eq('stream', stream)
+      .eq('year', year);
+
+    if (studentError) {
+      console.error('Error fetching students for sync:', studentError);
+      return;
+    }
+
+    if (!students || students.length === 0) return;
+
+    // 2. For each student, find all applicable fee items and sum them
+    for (const student of students) {
+      const { data: applicableFees, error: feeError } = await supabase
+        .from('fee_structures')
+        .select('total_fee')
+        .eq('college_id', adminCollegeId)
+        .eq('course_type', course_type)
+        .eq('stream', stream)
+        .eq('year', year)
+        .or(`accommodation.eq.${student.accommodation},accommodation.eq.both`);
+
+      if (feeError) {
+        console.error(`Error fetching fees for student ${student.id}:`, feeError);
+        continue;
+      }
+
+      const totalFee = (applicableFees || []).reduce((sum, f) => sum + Number(f.total_fee), 0);
+      const remainingFee = totalFee - Number(student.paid_fee);
+
+      // Only update and notify if total_fee actually changed
+      const { data: currentStudent } = await supabase.from('students').select('total_fee, user_id').eq('id', student.id).single();
+      
+      if (currentStudent && Number(currentStudent.total_fee) !== totalFee) {
+        await supabase
+          .from('students')
+          .update({
+            total_fee: totalFee,
+            remaining_fee: remainingFee
+          })
+          .eq('id', student.id);
+
+        // Notify student
+        await this.createNotification(
+          currentStudent.user_id,
+          'Fee Structure Updated',
+          `Your total fee for ${course_type} ${stream} Year ${year} has been updated to ₹${totalFee.toLocaleString()}.`,
+          'info'
+        );
+      }
+    }
+  }
+
+  /**
+   * Get metadata for fee creation (existing courses, streams, years)
+   */
+  async getFeeMetadata(adminCollegeId) {
+    const { data, error } = await supabase
+      .from('students')
+      .select('course_type, stream, year')
+      .eq('college_id', adminCollegeId);
+
+    if (error) throw error;
+
+    const metadata = {
+      courses: [...new Set(data.map(item => item.course_type))].filter(Boolean),
+      streams: [...new Set(data.map(item => item.stream))].filter(Boolean),
+      years: [1, 2, 3, 4]
+    };
+
+    return metadata;
+  }
+
+  /**
+   * Notification methods
+   */
+  async getNotifications(userId) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  }
+
+  async createNotification(userId, title, message, type = 'info') {
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert([{ user_id: userId, title, message, type }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 
   /**
@@ -142,12 +294,58 @@ class AdminService {
   }
 
   /**
-   * Update student details
+   * Update student details (and linked user details)
    */
   async updateStudent(adminCollegeId, studentId, updates) {
+    const { full_name, personal_email, ...studentUpdates } = updates;
+
+    // 1. If user details are provided, update the users table
+    if (full_name || personal_email) {
+      const { data: student } = await supabase
+        .from('students')
+        .select('user_id')
+        .eq('id', studentId)
+        .single();
+
+      if (student && student.user_id) {
+        const userUpdates = {};
+        if (full_name) userUpdates.full_name = full_name;
+        if (personal_email) userUpdates.personal_email = personal_email;
+
+        await supabase
+          .from('users')
+          .update(userUpdates)
+          .eq('id', student.user_id);
+      }
+    }
+
+    // 2. Fetch current fee state if we need to sync
+    if (studentUpdates.total_fee !== undefined || studentUpdates.remaining_fee !== undefined) {
+      const { data: currentStudent } = await supabase
+        .from('students')
+        .select('total_fee, paid_fee, remaining_fee')
+        .eq('id', studentId)
+        .single();
+
+      if (currentStudent) {
+        const paid = parseFloat(currentStudent.paid_fee) || 0;
+        
+        if (studentUpdates.total_fee !== undefined && studentUpdates.remaining_fee === undefined) {
+          // Admin updated Total, we auto-calculate Remaining
+          const total = parseFloat(studentUpdates.total_fee) || 0;
+          studentUpdates.remaining_fee = Math.max(0, total - paid);
+        } else if (studentUpdates.remaining_fee !== undefined && studentUpdates.total_fee === undefined) {
+          // Admin updated Remaining, we auto-calculate Total
+          const remaining = parseFloat(studentUpdates.remaining_fee) || 0;
+          studentUpdates.total_fee = paid + remaining;
+        }
+      }
+    }
+
+    // 3. Update the students table
     const { data, error } = await supabase
       .from('students')
-      .update(updates)
+      .update(studentUpdates)
       .eq('id', studentId)
       .eq('college_id', adminCollegeId)
       .select()
@@ -194,7 +392,7 @@ class AdminService {
   }
 
   /**
-   * Get KPI Stats for Dashboard
+   * Get KPI Stats for Dashboard & Detailed Analytics
    */
   async getAdminStats(adminCollegeId) {
     const { count: totalStudents } = await supabase
@@ -209,17 +407,37 @@ class AdminService {
 
     const { data: payments } = await supabase
       .from('payments')
-      .select('amount, status')
+      .select('amount, status, created_at, students(stream)')
       .eq('college_id', adminCollegeId);
 
     let totalCollected = 0;
-    let totalPendingAmount = 0; // Requires aggregating remaining fees from students
-    let recentPaymentsCount = 0;
+    const statusDistribution = { success: 0, pending: 0, failed: 0 };
+    const streamMap = {};
+    const monthlyMap = {};
 
     if (payments) {
-      totalCollected = payments
-        .filter(p => p.status === 'success' || p.status === 'paid' || p.status === 'captured')
-        .reduce((sum, p) => sum + Number(p.amount), 0);
+      payments.forEach(p => {
+        const isSuccess = ['success', 'paid', 'captured'].includes(p.status);
+        
+        // Status Distribution
+        if (isSuccess) statusDistribution.success++;
+        else if (['failed', 'error'].includes(p.status)) statusDistribution.failed++;
+        else statusDistribution.pending++;
+
+        if (isSuccess) {
+          const amt = Number(p.amount);
+          totalCollected += amt;
+
+          // Stream Breakdown
+          const stream = p.students?.stream || 'Other';
+          streamMap[stream] = (streamMap[stream] || 0) + amt;
+
+          // Monthly Trend
+          const date = new Date(p.created_at);
+          const monthKey = date.toLocaleString('default', { month: 'short' }); // e.g., 'Jan'
+          monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + amt;
+        }
+      });
     }
 
     const { data: students } = await supabase
@@ -227,9 +445,20 @@ class AdminService {
       .select('remaining_fee, total_fee')
       .eq('college_id', adminCollegeId);
 
+    let totalPendingAmount = 0;
     if (students) {
       totalPendingAmount = students.reduce((sum, s) => sum + Number(s.remaining_fee), 0);
     }
+
+    const collectionByStream = Object.keys(streamMap).map(name => ({
+      name,
+      amount: streamMap[name],
+    }));
+
+    const monthlyRevenue = Object.keys(monthlyMap).map(month => ({
+      month,
+      amount: monthlyMap[month],
+    }));
 
     const { data: recentPayments } = await supabase
       .from('payments')
@@ -238,12 +467,22 @@ class AdminService {
       .order('created_at', { ascending: false })
       .limit(5);
 
+    const { count: pendingResetsCount } = await supabase
+      .from('password_reset_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('college_id', adminCollegeId)
+      .eq('status', 'pending');
+
     return {
       total_students: totalStudents || 0,
       active_fee_structures: activeFeeStructures || 0,
       total_collected: totalCollected,
       total_pending: totalPendingAmount,
-      recent_payments: recentPayments || []
+      recent_payments: recentPayments || [],
+      collection_by_stream: collectionByStream,
+      monthly_revenue: monthlyRevenue,
+      status_distribution: statusDistribution,
+      pending_resets_count: pendingResetsCount || 0
     };
   }
 

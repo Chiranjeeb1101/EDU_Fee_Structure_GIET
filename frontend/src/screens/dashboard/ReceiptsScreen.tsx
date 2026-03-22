@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Dimensions, Platform, LayoutAnimation, UIManager } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
+import { useAuth } from '../../context/AuthContext';
 import studentService, { PaymentHistoryItem } from '../../services/studentService';
 import { ActivityIndicator, Alert, Linking } from 'react-native';
 import api from '../../services/api';
@@ -34,6 +36,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export const ReceiptsScreen = () => {
   const navigation = useNavigation();
+  const { token } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [receipts, setReceipts] = useState<PaymentHistoryItem[]>([]);
@@ -46,7 +49,7 @@ export const ReceiptsScreen = () => {
     try {
       const data = await studentService.getPaymentHistory();
       // Only successfully captured payments have receipts
-      setReceipts(data.filter(p => p.status === 'captured' || p.status === 'success'));
+      setReceipts(data.filter(p => p.status === 'paid'));
     } catch (error) {
       console.error('Receipts fetch failed:', error);
     } finally {
@@ -56,17 +59,28 @@ export const ReceiptsScreen = () => {
 
   const filteredReceipts = useMemo(() => {
     return receipts.filter(r => 
-      r.razorpay_order_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.stripe_checkout_session_id?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
       r.id.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery, receipts]);
 
   const handleDownload = async (receiptId: string) => {
     try {
-      const url = `${api.defaults.baseURL}/payments/${receiptId}/receipt`;
-      // Open in browser to download PDF
+      let currentToken = token;
+      if (!currentToken) {
+        currentToken = await AsyncStorage.getItem('auth_token');
+      }
+
+      if (!currentToken) {
+        Alert.alert('Authentication Error', 'Could not verify your session. Please login again.');
+        return;
+      }
+
+      const url = `${api.defaults.baseURL}/payments/${receiptId}/receipt?token=${currentToken}`;
+      console.log('Downloading receipt from:', url);
       await Linking.openURL(url);
     } catch (error) {
+      console.error('Receipt download error:', error);
       Alert.alert('Error', 'Failed to open receipt download link.');
     }
   };
@@ -122,7 +136,7 @@ export const ReceiptsScreen = () => {
               filteredReceipts.map(r => (
                 <TouchableOpacity key={r.id} onPress={() => handleDownload(r.id)} activeOpacity={0.8}>
                    <ReceiptCard 
-                    title={r.razorpay_order_id ? `Receipt: ${r.razorpay_order_id.substring(0, 10)}...` : 'Institutional Receipt'}
+                    title={r.stripe_checkout_session_id ? `Receipt: ${r.stripe_checkout_session_id.substring(0, 10)}...` : 'Institutional Receipt'}
                     date={new Date(r.created_at).toLocaleDateString()} 
                     amount={r.amount.toLocaleString()} 
                     icon="receipt" 

@@ -1,14 +1,50 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, TextInput, KeyboardAvoidingView, ScrollView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../App';
 import { GlowingBackground } from '../../components/layout/GlowingBackground';
 import { colors } from '../../theme/colors';
+import resetService from '../../services/resetService';
 
 export const ForgotPasswordScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [collegeId, setCollegeId] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [existingRequest, setExistingRequest] = useState<any>(null);
+
+  const handleResetRequest = async () => {
+    if (!collegeId.trim()) {
+      Alert.alert('Error', 'Please enter your College ID.');
+      return;
+    }
+
+    setIsLoading(true);
+    setExistingRequest(null);
+    try {
+      const result = await resetService.requestReset(collegeId.trim());
+      
+      if (result.alreadyExists) {
+        setExistingRequest(result.data);
+        if (result.data.status === 'approved') {
+          Alert.alert('Approved!', 'Your request has been approved by the Admin. You can now set your new password.');
+        } else if (result.data.status === 'pending') {
+          Alert.alert('Pending', 'Your request is still waiting for Admin approval.');
+        } else if (result.data.status === 'rejected') {
+          Alert.alert('Rejected', 'Your request was rejected by the Admin. Please contact the office.');
+        }
+      } else {
+        setIsSuccess(true);
+      }
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Failed to send request. Please try again.';
+      Alert.alert('Error', msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <GlowingBackground showParticles={false}>
@@ -35,39 +71,81 @@ export const ForgotPasswordScreen = () => {
                 <View style={styles.iconContainer}>
                   <View style={styles.iconGlow} />
                   <View style={styles.iconCircle}>
-                    <MaterialIcons name="lock-reset" size={48} color={colors.primary} />
+                    <MaterialIcons 
+                      name={isSuccess ? "mark-email-read" : "lock-reset"} 
+                      size={48} 
+                      color={isSuccess ? colors.success : colors.primary} 
+                    />
                   </View>
                 </View>
 
                 {/* Typography Output */}
-                <Text style={styles.title}>Forgot Password?</Text>
+                <Text style={styles.title}>
+                  {existingRequest?.status === 'approved' ? "Request Approved!" : (isSuccess ? "Request Sent!" : "Forgot Password?")}
+                </Text>
                 <Text style={styles.subtitle}>
-                  No worries, it happens. Enter your registered email or student ID to reset your password.
+                  {existingRequest?.status === 'approved' 
+                    ? "Great news! The Admin has approved your reset request. Tap the button below to set your new password."
+                    : (isSuccess 
+                        ? "Your reset request has been sent to the GIET Admin. Please check back later or visit the Admin office for approval."
+                        : "No worries, it happens. Enter your registered College ID to request a password reset from the Admin."
+                      )
+                  }
                 </Text>
 
                 {/* Form Elements */}
-                <View style={styles.formContainer}>
-                  <Text style={styles.inputLabel}>EMAIL OR STUDENT ID</Text>
-                  <View style={styles.inputWrapper}>
-                    <MaterialIcons name="mail" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-                    <TextInput 
-                      style={styles.input}
-                      placeholder="e.g. name@university.edu"
-                      placeholderTextColor="rgba(255,255,255,0.3)"
-                      autoCapitalize="none"
-                    />
-                  </View>
+                {!isSuccess && !existingRequest ? (
+                  <View style={styles.formContainer}>
+                    <Text style={styles.inputLabel}>COLLEGE ID NUMBER</Text>
+                    <View style={styles.inputWrapper}>
+                      <MaterialIcons name="badge" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+                      <TextInput 
+                        style={styles.input}
+                        placeholder="e.g. 2401326..."
+                        placeholderTextColor="rgba(255,255,255,0.3)"
+                        autoCapitalize="characters"
+                        value={collegeId}
+                        onChangeText={setCollegeId}
+                      />
+                    </View>
 
-                  <TouchableOpacity style={styles.submitButton} activeOpacity={0.8}>
-                    <Text style={styles.submitText}>Send Reset Link</Text>
-                  </TouchableOpacity>
-                </View>
+                    <TouchableOpacity 
+                      style={[styles.submitButton, isLoading && { opacity: 0.7 }]} 
+                      activeOpacity={0.8}
+                      onPress={handleResetRequest}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator color="#00266e" />
+                      ) : (
+                        <Text style={styles.submitText}>Submit Request</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                   <View style={styles.formContainer}>
+                      {existingRequest?.status === 'approved' && (
+                        <TouchableOpacity 
+                          style={[styles.submitButton, { backgroundColor: colors.success, marginBottom: 12 }]} 
+                          onPress={() => navigation.navigate('ResetPasswordCompletion', { requestId: existingRequest.id })}
+                        >
+                           <Text style={[styles.submitText, { color: 'white' }]}>Set New Password Now</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity style={styles.submitButton} onPress={() => navigation.goBack()}>
+                        <Text style={styles.submitText}>Back to Login</Text>
+                      </TouchableOpacity>
+                   </View>
+                )}
 
                 {/* Footer Link */}
-                <TouchableOpacity style={styles.footerLink} onPress={() => navigation.goBack()}>
-                  <MaterialIcons name="arrow-back" size={16} color={colors.violetAccent} />
-                  <Text style={styles.footerLinkText}>Back to Login</Text>
-                </TouchableOpacity>
+                {!isSuccess && (
+                  <TouchableOpacity style={styles.footerLink} onPress={() => navigation.goBack()}>
+                    <MaterialIcons name="arrow-back" size={16} color={colors.violetAccent} />
+                    <Text style={styles.footerLinkText}>Back to Login</Text>
+                  </TouchableOpacity>
+                )}
 
               </View>
 
@@ -75,8 +153,10 @@ export const ForgotPasswordScreen = () => {
               <View style={styles.infoCard}>
                 <MaterialIcons name="info" size={20} color={colors.electricBlue} style={styles.infoIcon} />
                 <View style={styles.infoContent}>
-                  <Text style={styles.infoTitle}>SECURITY TIP</Text>
-                  <Text style={styles.infoDesc}>Ensure you have access to your primary academic inbox before requesting a link.</Text>
+                  <Text style={styles.infoTitle}>SYSTEM INFO</Text>
+                  <Text style={styles.infoDesc}>
+                    Password resets require manual approval by the GIET Administration for security.
+                  </Text>
                 </View>
               </View>
 

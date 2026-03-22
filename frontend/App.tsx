@@ -9,6 +9,7 @@ import { ForgotPasswordScreen } from './src/screens/auth/ForgotPasswordScreen';
 import { SupportCenterScreen } from './src/screens/auth/SupportCenterScreen';
 import { RegisterScreen } from './src/screens/auth/RegisterScreen';
 import { RegistrationSuccessScreen } from './src/screens/auth/RegistrationSuccessScreen';
+import { ResetPasswordCompletionScreen } from './src/screens/auth/ResetPasswordCompletionScreen';
 import { DashboardScreen } from './src/screens/dashboard/DashboardScreen';
 import { NotificationScreen } from './src/screens/dashboard/NotificationScreen';
 import { HistoryScreen } from './src/screens/dashboard/HistoryScreen';
@@ -20,6 +21,7 @@ import { ProfileScreen } from './src/screens/dashboard/ProfileScreen';
 import { IdentityCardScreen } from './src/screens/dashboard/IdentityCardScreen';
 import SecurityScreen from './src/screens/dashboard/SecurityScreen';
 import PaymentMethodsScreen from './src/screens/dashboard/PaymentMethodsScreen';
+import { PaymentWebViewScreen } from './src/screens/dashboard/PaymentWebViewScreen';
 import { AdminDashboardScreen } from './src/screens/admin/AdminDashboardScreen';
 import { AdminStudentsScreen } from './src/screens/admin/AdminStudentsScreen';
 import { AdminFeeStructureScreen } from './src/screens/admin/AdminFeeStructureScreen';
@@ -29,29 +31,33 @@ import { AdminStudentDetailScreen } from './src/screens/admin/AdminStudentDetail
 import { AdminSettingsScreen } from './src/screens/admin/AdminSettingsScreen';
 import { AdminAddStudentScreen } from './src/screens/admin/AdminAddStudentScreen';
 import { AdminNotificationsScreen } from './src/screens/admin/AdminNotificationsScreen';
+import { AdminResetRequestsScreen } from './src/screens/admin/AdminResetRequestsScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BottomNav } from './src/components/navigation/BottomNav';
 import { AdminBottomNav } from './src/components/navigation/AdminBottomNav';
 import { PanResponder, View } from 'react-native';
-
 import { NavContext } from './src/context/NavContext';
+import { BioLockScreen } from './src/screens/auth/BioLockScreen';
+import { useAuth } from './src/context/AuthContext';
 
 export type RootStackParamList = {
   Welcome: undefined;
   Login: undefined;
   ForgotPassword: undefined;
+  ResetPasswordCompletion: { requestId?: string };
   SupportCenter: undefined;
   Register: undefined;
-  RegistrationSuccess: { user: any; student: any };
+  RegistrationSuccess: { user: any; student: any; token: string };
+  BioLock: undefined;
   MainTabs: { screen: string } | undefined;
   AdminTabs: { screen: string } | undefined;
   Notification: undefined;
   Calendar: undefined;
   Profile: undefined;
-  // Screens for navigation
   DigitalIdentityCard: undefined;
   Security: undefined;
   PaymentMethods: undefined;
+  PaymentWebView: { checkoutUrl: string };
   AdminStudentDetail: { studentId: string };
   AdminAddStudent: undefined;
   AdminNotifications: undefined;
@@ -59,8 +65,7 @@ export type RootStackParamList = {
   AdminAnalytics: undefined;
   AdminPayments: undefined;
   AdminSettings: undefined;
-  
-  // Tab screens (listed for TS inference)
+  AdminResetRequests: undefined;
   Dashboard: undefined;
   History: undefined;
   Receipts: undefined;
@@ -103,7 +108,8 @@ function AdminTabs() {
   );
 }
 
-export default function App() {
+function AppContent() {
+  const { isAuthenticated, isBioEnabled, isBioVerified, isLoading, token, user } = useAuth();
   const [isNavVisible, setIsNavVisible] = React.useState(true);
   const idleTimer = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -135,8 +141,9 @@ export default function App() {
     };
   }, []);
 
+  if (isLoading) return null;
+
   return (
-    <AuthProvider>
     <NavContext.Provider value={{ isNavVisible }}>
       <View style={{ flex: 1 }} {...panResponder.panHandlers}>
         <NavigationContainer>
@@ -144,34 +151,61 @@ export default function App() {
           <Stack.Navigator 
             screenOptions={{ 
               headerShown: false,
-              animation: 'fade_from_bottom', // smooth stack transitions
+              animation: 'fade_from_bottom', 
             }}
           >
-            <Stack.Screen name="Welcome" component={WelcomeScreen} />
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-            <Stack.Screen name="SupportCenter" component={SupportCenterScreen} />
-            <Stack.Screen name="Register" component={RegisterScreen} />
-            <Stack.Screen name="RegistrationSuccess" component={RegistrationSuccessScreen} />
-            <Stack.Screen name="MainTabs" component={MainTabs} />
-            <Stack.Screen name="Notification" component={NotificationScreen} />
-            <Stack.Screen name="Calendar" component={CalendarScreen} />
-            <Stack.Screen name="Profile" component={ProfileScreen} />
-            <Stack.Screen name="DigitalIdentityCard" component={IdentityCardScreen} />
-            <Stack.Screen name="Security" component={SecurityScreen} />
-            <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
-            <Stack.Screen name="AdminTabs" component={AdminTabs} />
-            <Stack.Screen name="AdminStudentDetail" component={AdminStudentDetailScreen} />
-            <Stack.Screen name="AdminAddStudent" component={AdminAddStudentScreen} />
-            <Stack.Screen name="AdminNotifications" component={AdminNotificationsScreen} />
-            <Stack.Screen name="AdminFeeStructure" component={AdminFeeStructureScreen} />
-            <Stack.Screen name="AdminAnalytics" component={AdminAnalyticsScreen} />
-            <Stack.Screen name="AdminPayments" component={AdminPaymentsScreen} />
-            <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
+            {!token ? (
+              <>
+                <Stack.Screen name="Welcome" component={WelcomeScreen} />
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+                <Stack.Screen name="ResetPasswordCompletion" component={ResetPasswordCompletionScreen} />
+                <Stack.Screen name="SupportCenter" component={SupportCenterScreen} />
+                <Stack.Screen name="Register" component={RegisterScreen} />
+                <Stack.Screen name="RegistrationSuccess" component={RegistrationSuccessScreen} />
+              </>
+            ) : (isBioEnabled && !isBioVerified) ? (
+              <Stack.Screen name="BioLock" component={BioLockScreen} />
+            ) : (
+              <>
+                {user?.role === 'admin' ? (
+                  <>
+                    <Stack.Screen name="AdminTabs" component={AdminTabs} />
+                    <Stack.Screen name="AdminStudentDetail" component={AdminStudentDetailScreen} />
+                    <Stack.Screen name="AdminAddStudent" component={AdminAddStudentScreen} />
+                    <Stack.Screen name="AdminNotifications" component={AdminNotificationsScreen} />
+                    <Stack.Screen name="AdminFeeStructure" component={AdminFeeStructureScreen} />
+                    <Stack.Screen name="AdminAnalytics" component={AdminAnalyticsScreen} />
+                    <Stack.Screen name="AdminPayments" component={AdminPaymentsScreen} />
+                    <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
+                    <Stack.Screen name="AdminResetRequests" component={AdminResetRequestsScreen} />
+                  </>
+                ) : (
+                  <>
+                    <Stack.Screen name="MainTabs" component={MainTabs} />
+                    <Stack.Screen name="RegistrationSuccess" component={RegistrationSuccessScreen} />
+                    <Stack.Screen name="Notification" component={NotificationScreen} />
+                    <Stack.Screen name="Calendar" component={CalendarScreen} />
+                    <Stack.Screen name="Profile" component={ProfileScreen} />
+                    <Stack.Screen name="DigitalIdentityCard" component={IdentityCardScreen} />
+                    <Stack.Screen name="Security" component={SecurityScreen} />
+                    <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+                    <Stack.Screen name="PaymentWebView" component={PaymentWebViewScreen} />
+                  </>
+                )}
+              </>
+            )}
           </Stack.Navigator>
         </NavigationContainer>
       </View>
     </NavContext.Provider>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
     </AuthProvider>
   );
 }

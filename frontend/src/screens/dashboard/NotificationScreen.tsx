@@ -1,59 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Platform, LayoutAnimation, UIManager, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Platform, LayoutAnimation, UIManager, Alert, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../App';
 import { colors } from '../../theme/colors';
+import studentService from '../../services/studentService';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: '1',
-    title: "Tuition Fee Reminder",
-    desc: "Your semester 4 tuition fee is due in 3 days. Please complete the payment to avoid late charges.",
-    time: "2 hours ago",
-    isNew: true,
-    icon: "event-busy",
-    color: colors.error,
-    section: "Today"
-  },
-  {
-    id: '2',
-    title: "System Maintenance",
-    desc: "The portal will be down for scheduled maintenance from 2 AM to 4 AM tonight.",
-    time: "5 hours ago",
-    isNew: true,
-    icon: "settings",
-    color: colors.tertiary,
-    section: "Today"
-  },
-  {
-    id: '3',
-    title: "Receipt Generated",
-    desc: "Your payment of ₹15,000 for Hostel Maintenance has been confirmed. Receipt is ready to download.",
-    time: "2 days ago",
-    isNew: false,
-    icon: "receipt-long",
-    color: colors.secondary,
-    section: "Earlier this week"
-  },
-  {
-    id: '4',
-    title: "Welcome to Luminous",
-    desc: "Your student account has been successfully verified. ID card is now active.",
-    time: "4 days ago",
-    isNew: false,
-    icon: "verified-user",
-    color: colors.primary,
-    section: "Earlier this week"
-  }
-];
 
 const NotificationItem = ({ item, onDelete, onRead }: any) => (
   <TouchableOpacity 
@@ -78,36 +36,55 @@ const NotificationItem = ({ item, onDelete, onRead }: any) => (
 
 export const NotificationScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const loadNotifs = async () => {
-      try {
-        const stored = await AsyncStorage.getItem('notifications_state');
-        if (stored) {
-          setNotifications(JSON.parse(stored));
-        }
-      } catch (err) {}
-    };
     loadNotifs();
   }, []);
 
-  const persistNotifs = async (newNotifs: any[]) => {
-    setNotifications(newNotifs);
+  const loadNotifs = async () => {
     try {
-      await AsyncStorage.setItem('notifications_state', JSON.stringify(newNotifs));
-    } catch (err) {}
+      const data = await studentService.getNotifications();
+      const formatted = (data || []).map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        desc: n.message,
+        time: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isNew: !n.is_read,
+        icon: n.icon || 'notifications',
+        color: n.color || colors.primary,
+        section: new Date(n.created_at).toDateString() === new Date().toDateString() ? 'Today' : 'Earlier this week'
+      }));
+      setNotifications(formatted);
+    } catch (err) {
+      console.error('Failed to load notifications', err);
+    }
   };
 
-  const handleRead = (id: string) => {
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadNotifs();
+    setRefreshing(false);
+  }, []);
+
+  const handleRead = async (id: string) => {
+    // Optimistic UI update
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const updated = notifications.map(n => n.id === id ? { ...n, isNew: false } : n);
-    persistNotifs(updated);
+    setNotifications(notifications.map(n => n.id === id ? { ...n, isNew: false } : n));
+    
+    // API Call
+    try {
+      await studentService.markNotificationRead(id);
+    } catch (err) {
+      console.error('Failed to mark read', err);
+    }
   };
 
   const handleDelete = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    persistNotifs(notifications.filter(n => n.id !== id));
+    setNotifications(notifications.filter(n => n.id !== id));
+    // Implementation note: a real delete API would go here
   };
 
   const handleClearAll = () => {
@@ -121,7 +98,7 @@ export const NotificationScreen = () => {
           style: "destructive", 
           onPress: () => {
             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            persistNotifs([]);
+            setNotifications([]);
           } 
         }
       ]
@@ -145,7 +122,18 @@ export const NotificationScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
           
           {notifications.length === 0 ? (
             <View style={styles.emptyState}>
