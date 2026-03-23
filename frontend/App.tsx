@@ -39,7 +39,10 @@ import { AdminBottomNav } from './src/components/navigation/AdminBottomNav';
 import { PanResponder, View } from 'react-native';
 import { NavContext } from './src/context/NavContext';
 import { BioLockScreen } from './src/screens/auth/BioLockScreen';
+import Constants from 'expo-constants';
 import { useAuth } from './src/context/AuthContext';
+
+// RootStackParamList definition...
 
 export type RootStackParamList = {
   Welcome: undefined;
@@ -138,6 +141,28 @@ function AppContent() {
 
   React.useEffect(() => {
     resetIdleTimer();
+    
+    // Configure notifications locally
+    const setupNotifications = async () => {
+      // Direct import from 'expo-notifications' entry point triggers a forbidden push token listener 
+      // in Expo Go SDK 53/54. Deep importing the specific handler avoids this side-effect.
+      try {
+        const { setNotificationHandler } = require('expo-notifications/build/NotificationsHandler');
+        setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
+          }),
+        });
+      } catch (e) {
+        console.warn('Notifications restricted in this environment');
+      }
+    };
+    setupNotifications();
+
     return () => {
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };

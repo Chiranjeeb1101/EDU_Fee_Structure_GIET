@@ -30,6 +30,23 @@ class StudentService {
       throw Object.assign(new Error('Failed to fetch payment history.'), { statusCode: 500 });
     }
 
+    // 3. Fetch unread notification count
+    const { count: unreadCount } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+
+    // 4. Fetch fee breakdown (individual components)
+    const { data: applicableFees } = await supabase
+      .from('fee_structures')
+      .select('title, total_fee')
+      .eq('college_id', student.college_id)
+      .eq('course_type', student.course_type)
+      .eq('stream', student.stream)
+      .eq('year', student.year)
+      .or(`accommodation.eq.${student.accommodation},accommodation.eq.both`);
+
     return {
       profile_complete: student.profile_complete,
       fee_status: {
@@ -37,6 +54,8 @@ class StudentService {
         paid_fee: student.paid_fee,
         remaining_fee: student.remaining_fee,
       },
+      unread_notifications_count: unreadCount || 0,
+      fee_breakdown: applicableFees || [],
       payment_history: payments || [],
     };
   }

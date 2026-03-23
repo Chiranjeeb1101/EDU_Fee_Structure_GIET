@@ -113,7 +113,8 @@ exports.deleteStudent = async (req, res) => {
 
 exports.getAdminStats = async (req, res) => {
   const adminCollegeId = req.user.college_id;
-  const stats = await adminService.getAdminStats(adminCollegeId);
+  const adminUserId = req.user.id;
+  const stats = await adminService.getAdminStats(adminCollegeId, adminUserId);
 
   res.status(200).json({
     success: true,

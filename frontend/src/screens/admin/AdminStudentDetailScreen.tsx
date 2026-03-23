@@ -59,16 +59,46 @@ export const AdminStudentDetailScreen = () => {
   const handleUpdate = async () => {
     setUpdating(true);
     try {
-      const updates = {
-        full_name: editForm.full_name,
-        personal_email: editForm.personal_email,
-        course_type: editForm.course_type,
-        stream: editForm.stream,
-        year: parseInt(editForm.year) || null,
-        accommodation: editForm.accommodation,
-        remaining_fee: parseFloat(editForm.remaining_fee) || 0,
-        total_fee: parseFloat(editForm.total_fee) || 0,
-      };
+      const updates: any = {};
+      
+      // Only include fields that have actually changed to avoid redundant backend logic/notifications
+      if (editForm.full_name !== (student.users?.full_name || '')) {
+        updates.full_name = editForm.full_name;
+      }
+      if (editForm.personal_email !== (student.users?.personal_email || '')) {
+        updates.personal_email = editForm.personal_email;
+      }
+      if (editForm.course_type !== (student.course_type || '')) {
+        updates.course_type = editForm.course_type;
+      }
+      if (editForm.stream !== (student.stream || '')) {
+        updates.stream = editForm.stream;
+      }
+      
+      const formYear = parseInt(editForm.year) || null;
+      if (formYear !== student.year) {
+        updates.year = formYear;
+      }
+      
+      if (editForm.accommodation !== student.accommodation) {
+        updates.accommodation = editForm.accommodation;
+      }
+      
+      const formRemaining = parseFloat(editForm.remaining_fee) || 0;
+      if (formRemaining !== (parseFloat(student.remaining_fee) || 0)) {
+        updates.remaining_fee = formRemaining;
+      }
+      
+      const formTotal = parseFloat(editForm.total_fee) || 0;
+      if (formTotal !== (parseFloat(student.total_fee) || 0)) {
+        updates.total_fee = formTotal;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        setShowEdit(false);
+        return;
+      }
+
       await adminService.updateStudent(studentId, updates);
       Alert.alert('Success', 'Student details updated');
       setShowEdit(false);

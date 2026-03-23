@@ -56,6 +56,7 @@ export const DashboardScreen = () => {
   // Fee Toggle State
   const [showPending, setShowPending] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
   const autoRotateRef = useRef<any>(null);
   const manualOverrideRef = useRef(false);
 
@@ -217,7 +218,9 @@ export const DashboardScreen = () => {
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notification')}>
                 <MaterialIcons name="notifications" size={24} color={colors.textSecondary} />
-                <View style={styles.unreadDot} />
+                {dashboardData && dashboardData.unread_notifications_count > 0 && (
+                  <View style={styles.unreadDot} />
+                )}
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.profileBadge}
@@ -238,7 +241,13 @@ export const DashboardScreen = () => {
             <View style={styles.featuredCardWrapper}>
               <View style={styles.featuredGlow} />
               <View style={styles.featuredCard}>
-                <TouchableOpacity activeOpacity={0.9} style={styles.feeTop} onPress={handleToggleFeeView}>
+                <TouchableOpacity 
+                  activeOpacity={0.9} 
+                  style={styles.feeTop} 
+                  onPress={handleToggleFeeView}
+                  onLongPress={() => setShowBreakdownModal(true)}
+                  delayLongPress={500}
+                >
                   <Animated.View style={{
                     opacity: flipAnim,
                     transform: [
@@ -255,8 +264,8 @@ export const DashboardScreen = () => {
                     </Text>
                     <View style={styles.feeToggleHint}>
                       <Animated.View style={[styles.autoRotateDot, { opacity: pulseAnim, backgroundColor: showPending ? colors.error : colors.primary }]} />
-                      <MaterialIcons name="touch-app" size={12} color={showPending ? colors.error : colors.primary} style={{ opacity: 0.8 }} />
-                      <Text style={[styles.feeToggleText, showPending && { color: colors.error }]}>Tap to toggle view</Text>
+                      <MaterialIcons name="info-outline" size={12} color={showPending ? colors.error : colors.primary} style={{ opacity: 0.8 }} />
+                      <Text style={[styles.feeToggleText, showPending && { color: colors.error }]}>Hold for breakdown</Text>
                     </View>
                   </Animated.View>
                   <TouchableOpacity style={styles.payBtn} onPress={openPaymentModal}>
@@ -298,25 +307,44 @@ export const DashboardScreen = () => {
               </ScrollView>
             </View>
 
-            {/* Upcoming Deadlines */}
+            {/* Fee Components / Deadlines */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Upcoming Deadlines</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Calendar')}>
-                  <Text style={styles.sectionLink}>VIEW CALENDAR</Text>
+                <Text style={styles.sectionTitle}>Fee Breakdown & Status</Text>
+                <TouchableOpacity onPress={() => setShowBreakdownModal(true)}>
+                  <Text style={styles.sectionLink}>VIEW ALL</Text>
                 </TouchableOpacity>
               </View>
               
-              <DeadlineTask 
-                dateNum="15" dateMonth="Aug" 
-                title="Tuition Fee" subtitle="Study • Sem 4 Enrollment" 
-                amount="₹12,500" timeLabel="DUE IN 3 DAYS" isUrgent={true} 
-              />
-              <DeadlineTask 
-                dateNum="01" dateMonth="Sep" 
-                title="Hostel Fee" subtitle="Quarterly Maintenance" 
-                amount="₹2,500" timeLabel="IN 2 WEEKS" isUrgent={false} 
-              />
+              {dashboardData?.fee_breakdown && dashboardData.fee_breakdown.length > 0 ? (
+                (() => {
+                  let remainingPaid = feeStatus.paid_fee;
+                  return dashboardData.fee_breakdown.map((item, idx) => {
+                    const itemAmount = Number(item.total_fee);
+                    const amountCleared = Math.min(remainingPaid, itemAmount);
+                    remainingPaid = Math.max(0, remainingPaid - itemAmount);
+                    const isFullyPaid = amountCleared >= itemAmount;
+                    const amountPending = itemAmount - amountCleared;
+
+                    return (
+                      <DeadlineTask 
+                        key={idx}
+                        dateNum={isFullyPaid ? '✓' : idx + 1} 
+                        dateMonth={isFullyPaid ? 'PAID' : 'DUE'} 
+                        title={item.title} 
+                        subtitle={isFullyPaid ? 'Payment Received' : 'Awaiting Payment'} 
+                        amount={`₹${itemAmount.toLocaleString()}`} 
+                        timeLabel={isFullyPaid ? 'CLEARED' : `₹${amountPending.toLocaleString()} PENDING`} 
+                        isUrgent={!isFullyPaid && idx < 2} 
+                      />
+                    );
+                  });
+                })()
+              ) : (
+                <View style={styles.emptyBreakdown}>
+                  <Text style={styles.emptyBreakdownText}>No fee components defined.</Text>
+                </View>
+              )}
             </View>
 
             {/* Smart Insight */}
@@ -348,6 +376,76 @@ export const DashboardScreen = () => {
           </ScrollView>
 
           {/* Fee Breakdown Modal */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={showBreakdownModal}
+            onRequestClose={() => setShowBreakdownModal(false)}
+          >
+            <Pressable 
+              style={styles.modalOverlay} 
+              onPress={() => setShowBreakdownModal(false)}
+            >
+              <View style={styles.breakdownModalContent}>
+                <View style={styles.modalIndicator} />
+                <View style={styles.breakdownHeaderRow}>
+                  <MaterialIcons name="account-balance" size={24} color={colors.primary} />
+                  <Text style={styles.modalTitle}>Fee Breakdown</Text>
+                </View>
+                
+                <ScrollView style={styles.breakdownList} showsVerticalScrollIndicator={false}>
+                  {(() => {
+                    let remainingPaid = feeStatus.paid_fee;
+                    return dashboardData?.fee_breakdown?.map((item, idx) => {
+                      const itemAmount = Number(item.total_fee);
+                      const amountCleared = Math.min(remainingPaid, itemAmount);
+                      remainingPaid = Math.max(0, remainingPaid - itemAmount);
+                      const isFullyPaid = amountCleared >= itemAmount;
+                      const amountPending = itemAmount - amountCleared;
+
+                      return (
+                        <View key={idx} style={[styles.breakdownItem, isFullyPaid && styles.breakdownItemCleared]}>
+                          <View style={styles.breakdownItemLeft}>
+                            <Text style={styles.breakdownItemTitle}>{item.title}</Text>
+                            <Text style={styles.breakdownItemStatus}>
+                              {isFullyPaid ? 'FULLY CLEARED' : amountCleared > 0 ? 'PARTIALLY SETTLED' : 'AWAITING PAYMENT'}
+                            </Text>
+                          </View>
+                          <View style={styles.breakdownItemRight}>
+                            <Text style={styles.breakdownItemAmount}>₹{itemAmount.toLocaleString()}</Text>
+                            <Text style={[styles.breakdownItemPending, isFullyPaid && { color: colors.success }]}>
+                              {isFullyPaid ? 'No Dues' : `₹${amountPending.toLocaleString()} Left`}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    });
+                  })()}
+                </ScrollView>
+
+                <View style={styles.breakdownSummaryCard}>
+                  <View style={styles.summaryItem}>
+                    <Text style={styles.summaryLabel}>Total Settled</Text>
+                    <Text style={[styles.summaryValue, { color: colors.success }]}>₹{feeStatus.paid_fee.toLocaleString()}</Text>
+                  </View>
+                  <View style={styles.summaryDivider} />
+                  <View style={styles.summaryItem}>
+                    <Text style={styles.summaryLabel}>Net Pending</Text>
+                    <Text style={[styles.summaryValue, { color: colors.error }]}>₹{feeStatus.remaining_fee.toLocaleString()}</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity 
+                  style={styles.closeBtn} 
+                  onPress={() => setShowBreakdownModal(false)}
+                >
+                  <Text style={styles.closeBtnText}>DISMISS</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Modal>
+
+          {/* Settlement Progress Modal (Original) */}
           <Modal
             animationType="fade"
             transparent={true}
@@ -903,6 +1001,107 @@ const styles = StyleSheet.create({
     paddingTop: 15,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+  },
+  summaryItem: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    flex: 1,
+  },
+  summaryLabel: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  summaryDivider: {
+    width: 1,
+    height: '60%',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  emptyBreakdown: {
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  emptyBreakdownText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  breakdownModalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    width: '100%',
+    maxHeight: '80%',
+  },
+  breakdownHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  breakdownList: {
+    marginBottom: 20,
+  },
+  breakdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  breakdownItemCleared: {
+    borderColor: 'rgba(34, 197, 94, 0.2)',
+    backgroundColor: 'rgba(34, 197, 94, 0.05)',
+  },
+  breakdownItemLeft: {
+    flex: 1,
+  },
+  breakdownItemTitle: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  breakdownItemStatus: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  breakdownItemRight: {
+    alignItems: 'flex-end',
+  },
+  breakdownItemAmount: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  breakdownItemPending: {
+    color: colors.error,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  breakdownSummaryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+    padding: 12,
+    marginBottom: 24,
   },
   modalIndicator: {
     width: 40,
