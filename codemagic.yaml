@@ -1,7 +1,7 @@
 workflows:
   android-apk-build:
     name: Build Android APK
-    instance_type: linux_m # Using Linux for faster Android builds
+    instance_type: linux
     max_build_duration: 60
     environment:
       node: 20
