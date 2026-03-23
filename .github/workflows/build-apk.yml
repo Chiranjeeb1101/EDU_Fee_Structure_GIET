@@ -1,4 +1,5 @@
 name: Build Android APK
+# Trigger: Token updated by user
 
 on:
   push:
