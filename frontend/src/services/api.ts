@@ -10,11 +10,11 @@ const getBaseUrl = () => {
   if (__DEV__) {
     // For Web development
     if (Platform.OS === 'web') {
-      return 'http://localhost:5000/api';
+      return 'http://10.102.57.101:5000/api';
     }
     // For Mobile development (Android Emulator, iOS Simulator, or Physical Device)
-    // Using current machine IP: 10.113.71.97
-    return 'http://10.113.71.97:5000/api';
+    // Using current machine IP: 10.102.57.101
+    return 'http://10.102.57.101:5000/api';
   }
   // Production URL: Use environment variable if available, fallback to a placeholder
   return process.env.EXPO_PUBLIC_BACKEND_URL || 'https://your-production-api.com/api';
