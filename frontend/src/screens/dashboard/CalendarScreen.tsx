@@ -3,10 +3,11 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Dim
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
-const CalendarDay = ({ day, isPrevMonth, isActive, isCritical, onPress }: any) => {
+const CalendarDay = ({ day, isPrevMonth, isActive, isCritical, hasReminder, onPress }: any) => {
   if (isPrevMonth) {
     return (
       <View style={styles.dayCell}>
@@ -21,7 +22,8 @@ const CalendarDay = ({ day, isPrevMonth, isActive, isCritical, onPress }: any) =
       <Text style={[styles.dayText, isActive && styles.dayTextActive]}>{day}</Text>
       {isActive && <View style={styles.dayActiveDot} />}
       {!isActive && isCritical && <View style={styles.dayCriticalDot} />}
-      {!isActive && !isCritical && day === '1' && <View style={styles.dayInfoDot} />}
+      {!isActive && hasReminder && <View style={styles.dayReminderDot} />}
+      {!isActive && !isCritical && !hasReminder && day === '1' && <View style={styles.dayInfoDot} />}
     </TouchableOpacity>
   );
 };
@@ -37,6 +39,38 @@ export const CalendarScreen = () => {
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate());
+  const [reminders, setReminders] = useState<Record<string, string>>({}); // dateKey -> notificationId
+  const [isRequesting, setIsRequesting] = useState(false);
+
+  // Persistence Key
+  const REMINDERS_KEY = 'STUDENT_CALENDAR_REMINDERS';
+
+  useEffect(() => {
+    loadReminders();
+  }, []);
+
+  const loadReminders = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(REMINDERS_KEY);
+      if (stored) setReminders(JSON.parse(stored));
+    } catch (e) {
+      console.error('Failed to load reminders');
+    }
+  };
+
+  const saveReminders = async (updated: Record<string, string>) => {
+    try {
+      await AsyncStorage.setItem(REMINDERS_KEY, JSON.stringify(updated));
+      setReminders(updated);
+    } catch (e) {
+      console.error('Failed to save reminders');
+    }
+  };
+
+  const getDateKey = (day: number) => {
+    const d = new Date(year, monthIndex, day);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year: number, month: number) => {
@@ -76,21 +110,108 @@ export const CalendarScreen = () => {
     setSelectedDay(day);
   };
 
-  const handleSetReminder = () => {
+  const handleSetReminder = async () => {
     if (!selectedDay) return;
     
-    Alert.alert(
-      "Reminder Scheduled", 
-      `An in-app reminder has been set for ${selectedDay} ${monthStr}. (Demo: It will pop up in 5 seconds)`
-    );
+    const dateKey = getDateKey(selectedDay);
+    const existingId = reminders[dateKey];
 
-    // Simulate a reminder popping up after 5 seconds since Expo Go cannot use native push notifications anymore
-    setTimeout(() => {
+    // Deep importing specific functions from expo-notifications/build to avoid
+    // the forbidden push token listener in the index side-effect.
+    const { requestPermissionsAsync } = require('expo-notifications/build/NotificationPermissions');
+    const { scheduleNotificationAsync } = require('expo-notifications/build/scheduleNotificationAsync');
+    const { cancelScheduledNotificationAsync } = require('expo-notifications/build/cancelScheduledNotificationAsync');
+    const { SchedulableTriggerInputTypes } = require('expo-notifications/build/Notifications.types');
+    
+    const Notifications = {
+      requestPermissionsAsync,
+      scheduleNotificationAsync,
+      cancelScheduledNotificationAsync,
+      SchedulableTriggerInputTypes
+    };
+
+    if (existingId) {
+      // Logic to Remove Reminder
       Alert.alert(
-        "⏰ REMINDER ALARM", 
-        `Hey! This is your scheduled reminder for the event on ${selectedDay} ${monthStr} ${year}.`
+        "Existing Reminder",
+        "A reminder is already set for this day. Do you want to cancel it?",
+        [
+          { text: "Keep It", style: "cancel" },
+          { text: "Cancel Reminder", style: "destructive", onPress: async () => {
+            await Notifications.cancelScheduledNotificationAsync(existingId);
+            const updated = { ...reminders };
+            delete updated[dateKey];
+            saveReminders(updated);
+            Alert.alert("Cancelled", "The reminder has been removed.");
+          }}
+        ]
       );
-    }, 5000);
+      return;
+    }
+
+    // Request Permissions
+    setIsRequesting(true);
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Notifications are required to set reminders.');
+      setIsRequesting(false);
+      return;
+    }
+
+    // Schedule Notification
+    const scheduleDate = new Date(year, monthIndex, selectedDay, 9, 0, 0); // 9:00 AM
+    
+    // If date is in the past, offer a test notification (5 seconds from now) for demo purposes
+    // but ideally, we should prevent past reminders.
+    if (scheduleDate <= new Date()) {
+      Alert.alert(
+        "Past Date",
+        "This date has already passed. Would you like to set a test reminder for 10 seconds from now?",
+        [
+          { text: "No", style: "cancel" },
+          { text: "Yes, Test It", onPress: async () => {
+            const id = await Notifications.scheduleNotificationAsync({
+              content: {
+                title: "⏰ CAMPUS REMINDER",
+                body: `You set a test reminder for ${selectedDay} ${monthStr}. Time to check your tasks!`,
+                data: { day: selectedDay, month: monthStr },
+              },
+              trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: 10,
+              },
+            });
+            const updated = { ...reminders, [dateKey]: id };
+            saveReminders(updated);
+            Alert.alert("Success", "Test reminder set for 10 seconds!");
+          }}
+        ]
+      );
+      setIsRequesting(false);
+      return;
+    }
+
+    try {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "⏰ CAMPUS REMINDER",
+          body: `Don't forget your scheduled task for today, ${selectedDay} ${monthStr}!`,
+          data: { day: selectedDay, month: monthStr },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: scheduleDate,
+        },
+      });
+
+      const updated = { ...reminders, [dateKey]: id };
+      saveReminders(updated);
+      Alert.alert("Reminder Set", `Notification scheduled for ${selectedDay} ${monthStr} at 9:00 AM.`);
+    } catch (e) {
+      Alert.alert("Error", "Could not schedule notification.");
+    } finally {
+      setIsRequesting(false);
+    }
   };
 
   return (
@@ -139,14 +260,16 @@ export const CalendarScreen = () => {
             <View style={styles.daysGrid}>
               {prevDays.map(d => <CalendarDay key={`p-${d}`} day={d.toString()} isPrevMonth />)}
               {currDays.map(d => {
-                // Mocking some critical days and info days. We'll mark the 15th as critical as an example
-                const isCritical = (d === 15); 
+                const dateKey = getDateKey(d);
+                const isCritical = (d === 15);
+                const hasReminder = !!reminders[dateKey];
                 return (
                   <CalendarDay 
                     key={`c-${d}`} 
                     day={d.toString()} 
                     isActive={d === selectedDay}
                     isCritical={isCritical} 
+                    hasReminder={hasReminder}
                     onPress={() => handleDayPress(d)}
                   />
                 );
@@ -180,8 +303,14 @@ export const CalendarScreen = () => {
                   </View>
 
                   <View style={styles.detailsCardActions}>
-                    <TouchableOpacity style={styles.payNowBtn} onPress={handleSetReminder}>
-                      <Text style={styles.payNowText}>SET REMINDER</Text>
+                    <TouchableOpacity 
+                      style={[styles.payNowBtn, reminders[getDateKey(selectedDay)] && { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary }]} 
+                      onPress={handleSetReminder}
+                      disabled={isRequesting}
+                    >
+                      <Text style={[styles.payNowText, reminders[getDateKey(selectedDay)] && { color: colors.primary }]}>
+                        {reminders[getDateKey(selectedDay)] ? 'CANCEL REMINDER' : 'SET REMINDER'}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.actionCircleBtn}>
                       <MaterialIcons name="event" size={20} color={colors.primary} />
@@ -365,6 +494,14 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: colors.tertiary,
+  },
+  dayReminderDot: {
+    position: 'absolute',
+    bottom: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
   },
   detailsSection: {
     marginBottom: 32,

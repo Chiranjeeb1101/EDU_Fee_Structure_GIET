@@ -122,7 +122,11 @@ export const SettingsScreen = () => {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
           {/* Profile Section */}
-          <View style={styles.profileSection}>
+          <TouchableOpacity 
+            style={styles.profileSection}
+            onPress={() => (navigation as any).navigate('Profile')}
+            activeOpacity={0.8}
+          >
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarGlow} />
               <Image 
@@ -135,13 +139,10 @@ export const SettingsScreen = () => {
             </View>
             <Text style={styles.profileName}>{user?.full_name || 'Student Name'}</Text>
             <Text style={styles.profileEmail}>{user?.personal_email || user?.email || 'email@example.com'}</Text>
-            <TouchableOpacity 
-              style={styles.editProfileBtn}
-              onPress={() => (navigation as any).navigate('Profile')}
-            >
+            <View style={styles.editProfileBtn}>
               <Text style={styles.editProfileText}>Edit Profile</Text>
-            </TouchableOpacity>
-          </View>
+            </View>
+          </TouchableOpacity>
 
           {/* Account Settings */}
           <View style={styles.sectionBlock}>

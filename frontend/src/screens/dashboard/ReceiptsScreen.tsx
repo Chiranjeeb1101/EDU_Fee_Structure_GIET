@@ -10,7 +10,7 @@ import { ActivityIndicator, Alert, Linking } from 'react-native';
 import api from '../../services/api';
 
 const ReceiptCard = ({ title, date, amount, icon, colorHex }: any) => (
-  <TouchableOpacity style={styles.receiptCard} activeOpacity={0.8}>
+  <View style={styles.receiptCard}>
     <View style={styles.rcLeft}>
       <View style={[styles.rcIconBox, { backgroundColor: `${colorHex}1A`, borderColor: `${colorHex}33` }]}>
         <MaterialIcons name={icon} size={24} color={colorHex} />
@@ -27,7 +27,7 @@ const ReceiptCard = ({ title, date, amount, icon, colorHex }: any) => (
     <View style={styles.dlBtn}>
       <MaterialIcons name="download" size={20} color={colors.textSecondary} />
     </View>
-  </TouchableOpacity>
+  </View>
 );
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {

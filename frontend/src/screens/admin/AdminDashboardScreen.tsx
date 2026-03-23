@@ -101,6 +101,9 @@ export const AdminDashboardScreen = () => {
               <ResetBadge count={resetCount} onPress={() => (navigation as any).navigate('AdminResetRequests')} />
               <TouchableOpacity style={styles.profileBadge} onPress={() => (navigation as any).navigate('AdminNotifications')}>
                 <MaterialIcons name="notifications" size={22} color={colors.adminPrimary} />
+                {stats && stats.unread_notifications_count > 0 && (
+                  <View style={styles.unreadDot} />
+                )}
               </TouchableOpacity>
               <TouchableOpacity style={styles.profileBadge} onPress={() => (navigation as any).navigate('AdminSettings')}>
                 <MaterialIcons name="admin-panel-settings" size={24} color={colors.violetAccent} />
@@ -209,6 +212,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(139, 92, 246, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    backgroundColor: colors.error,
+    borderRadius: 4,
   },
   scrollContent: { paddingHorizontal: 24, paddingBottom: 100 },
   kpiGrid: {

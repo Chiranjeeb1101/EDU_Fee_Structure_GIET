@@ -18,6 +18,8 @@ export interface PaymentHistoryItem {
 export interface DashboardData {
   profile_complete: boolean;
   fee_status: FeeStatus;
+  unread_notifications_count: number;
+  fee_breakdown: { title: string; total_fee: number }[];
   payment_history: PaymentHistoryItem[];
 }
 

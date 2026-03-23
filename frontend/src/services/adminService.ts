@@ -10,6 +10,7 @@ export interface AdminStats {
   monthly_revenue: { month: string; amount: number }[];
   status_distribution: { success: number; pending: number; failed: number };
   pending_resets_count: number;
+  unread_notifications_count: number;
 }
 
 class AdminService {

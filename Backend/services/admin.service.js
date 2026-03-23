@@ -299,50 +299,89 @@ class AdminService {
   async updateStudent(adminCollegeId, studentId, updates) {
     const { full_name, personal_email, ...studentUpdates } = updates;
 
-    // 1. If user details are provided, update the users table
+    // 1. Fetch current student state for comparison
+    const { data: currentStudent, error: fetchError } = await supabase
+      .from('students')
+      .select('total_fee, paid_fee, remaining_fee, user_id, users(full_name, personal_email)')
+      .eq('id', studentId)
+      .single();
+
+    if (fetchError || !currentStudent) {
+      throw Object.assign(new Error('Student not found.'), { statusCode: 404 });
+    }
+
+    // 2. Handle User Profile Updates
     if (full_name || personal_email) {
-      const { data: student } = await supabase
-        .from('students')
-        .select('user_id')
-        .eq('id', studentId)
-        .single();
+      const userUpdates = {};
+      let profileChanged = false;
 
-      if (student && student.user_id) {
-        const userUpdates = {};
-        if (full_name) userUpdates.full_name = full_name;
-        if (personal_email) userUpdates.personal_email = personal_email;
+      if (full_name && full_name !== currentStudent.users?.full_name) {
+        userUpdates.full_name = full_name;
+        profileChanged = true;
+      }
+      if (personal_email && personal_email !== currentStudent.users?.personal_email) {
+        userUpdates.personal_email = personal_email;
+        profileChanged = true;
+      }
 
+      if (profileChanged) {
         await supabase
           .from('users')
           .update(userUpdates)
-          .eq('id', student.user_id);
+          .eq('id', currentStudent.user_id);
+
+        // Notify student about profile update
+        await this.createNotification(
+          currentStudent.user_id,
+          'Profile Updated',
+          'Admin has updated your profile details (Name/Email).',
+          'info'
+        );
       }
     }
 
-    // 2. Fetch current fee state if we need to sync
-    if (studentUpdates.total_fee !== undefined || studentUpdates.remaining_fee !== undefined) {
-      const { data: currentStudent } = await supabase
-        .from('students')
-        .select('total_fee, paid_fee, remaining_fee')
-        .eq('id', studentId)
-        .single();
+    // 3. Handle Fee Updates
+    let feeChanged = false;
+    const currentTotal = Number(currentStudent.total_fee) || 0;
+    const currentRemaining = Number(currentStudent.remaining_fee) || 0;
+    const paid = Number(currentStudent.paid_fee) || 0;
 
-      if (currentStudent) {
-        const paid = parseFloat(currentStudent.paid_fee) || 0;
-        
-        if (studentUpdates.total_fee !== undefined && studentUpdates.remaining_fee === undefined) {
-          // Admin updated Total, we auto-calculate Remaining
-          const total = parseFloat(studentUpdates.total_fee) || 0;
+    if (studentUpdates.total_fee !== undefined || studentUpdates.remaining_fee !== undefined) {
+      if (studentUpdates.total_fee !== undefined && studentUpdates.remaining_fee === undefined) {
+        // Admin updated Total, we auto-calculate Remaining
+        const total = parseFloat(studentUpdates.total_fee) || 0;
+        if (total !== currentTotal) {
+          feeChanged = true;
           studentUpdates.remaining_fee = Math.max(0, total - paid);
-        } else if (studentUpdates.remaining_fee !== undefined && studentUpdates.total_fee === undefined) {
-          // Admin updated Remaining, we auto-calculate Total
-          const remaining = parseFloat(studentUpdates.remaining_fee) || 0;
+        }
+      } else if (studentUpdates.remaining_fee !== undefined && studentUpdates.total_fee === undefined) {
+        // Admin updated Remaining, we auto-calculate Total
+        const remaining = parseFloat(studentUpdates.remaining_fee) || 0;
+        if (remaining !== currentRemaining) {
+          feeChanged = true;
           studentUpdates.total_fee = paid + remaining;
         }
+      } else if (studentUpdates.total_fee !== undefined && studentUpdates.remaining_fee !== undefined) {
+        // Admin updated both
+        const total = parseFloat(studentUpdates.total_fee) || 0;
+        const remaining = parseFloat(studentUpdates.remaining_fee) || 0;
+        if (total !== currentTotal || remaining !== currentRemaining) {
+          feeChanged = true;
+        }
+      }
+
+      if (feeChanged) {
+        // Notify student about fee update
+        await this.createNotification(
+          currentStudent.user_id,
+          'Fees Updated',
+          `Admin has updated your fee details. New Total: ₹${Number(studentUpdates.total_fee).toLocaleString()}`,
+          'warning'
+        );
       }
     }
 
-    // 3. Update the students table
+    // 4. Update the students table
     const { data, error } = await supabase
       .from('students')
       .update(studentUpdates)
@@ -394,7 +433,7 @@ class AdminService {
   /**
    * Get KPI Stats for Dashboard & Detailed Analytics
    */
-  async getAdminStats(adminCollegeId) {
+  async getAdminStats(adminCollegeId, adminUserId) {
     const { count: totalStudents } = await supabase
       .from('students')
       .select('*', { count: 'exact', head: true })
@@ -473,6 +512,12 @@ class AdminService {
       .eq('college_id', adminCollegeId)
       .eq('status', 'pending');
 
+    const { count: unreadCount } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', adminUserId)
+      .eq('is_read', false);
+
     return {
       total_students: totalStudents || 0,
       active_fee_structures: activeFeeStructures || 0,
@@ -482,7 +527,8 @@ class AdminService {
       collection_by_stream: collectionByStream,
       monthly_revenue: monthlyRevenue,
       status_distribution: statusDistribution,
-      pending_resets_count: pendingResetsCount || 0
+      pending_resets_count: pendingResetsCount || 0,
+      unread_notifications_count: unreadCount || 0
     };
   }
 

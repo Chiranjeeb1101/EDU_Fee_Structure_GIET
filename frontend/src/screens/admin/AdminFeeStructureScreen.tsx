@@ -24,6 +24,7 @@ export const AdminFeeStructureScreen = () => {
   const [year, setYear] = useState('1');
   const [accommodation, setAccommodation] = useState('both');
   const [academicYear, setAcademicYear] = useState('2025-26');
+  const [multiFees, setMultiFees] = useState({ tuition: '', registration: '', hostel: '', other: '' });
 
   useEffect(() => {
     fetchData();
@@ -78,32 +79,57 @@ export const AdminFeeStructureScreen = () => {
   const resetForm = () => {
     setEditingId(null);
     setTitle(''); setAmount(''); setYear('1'); setAccommodation('both'); setAcademicYear('2025-26');
+    setMultiFees({ tuition: '', registration: '', hostel: '', other: '' });
     if (metadata.courses.length > 0) setCourse(metadata.courses[0]);
     if (metadata.streams.length > 0) setStream(metadata.streams[0]);
   };
 
   const handleCreateOrUpdate = async () => {
-    if (!title || !amount || !course || !stream || !year || !accommodation || !academicYear) {
-      Alert.alert('Validation Error', 'Please fill all fields.');
+    if (editingId) {
+      if (!title || !amount) { Alert.alert('Validation Error', 'Please fill title and amount.'); return; }
+    } else {
+      const hasAny = Object.values(multiFees).some(v => v !== '' && Number(v) > 0);
+      if (!hasAny) { Alert.alert('Validation Error', 'Please enter at least one fee amount.'); return; }
+    }
+
+    if (!course || !stream || !year || !accommodation || !academicYear) {
+      Alert.alert('Validation Error', 'Please select all dropdown fields.');
       return;
     }
     
     setIsSubmitting(true);
     try {
-      const payload = {
-        title,
-        total_fee: Number(amount),
-        course_type: course,
-        stream,
-        year: Number(year),
-        accommodation,
-        academic_year: academicYear
-      };
-
       if (editingId) {
+        const payload = {
+          title,
+          total_fee: Number(amount),
+          course_type: course,
+          stream,
+          year: Number(year),
+          accommodation,
+          academic_year: academicYear
+        };
         await adminService.updateFeeStructure(editingId, payload);
       } else {
-        await adminService.createFeeStructure(payload);
+        // Multi Create
+        const items = [
+          { title: 'Tuition Fee', amount: multiFees.tuition },
+          { title: 'Registration Fee', amount: multiFees.registration },
+          { title: 'Hostel Fee', amount: multiFees.hostel },
+          { title: 'Other Fee', amount: multiFees.other }
+        ].filter(i => i.amount !== '' && Number(i.amount) > 0);
+
+        for (const item of items) {
+          await adminService.createFeeStructure({
+            title: item.title,
+            total_fee: Number(item.amount),
+            course_type: course,
+            stream,
+            year: Number(year),
+            accommodation,
+            academic_year: academicYear
+          });
+        }
       }
       
       setModalVisible(false);
@@ -224,15 +250,46 @@ export const AdminFeeStructureScreen = () => {
                   </View>
 
                   <ScrollView showsVerticalScrollIndicator={false}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.modalInputLabel}>FEE TITLE (e.g. Tution, Hostel)</Text>
-                      <TextInput style={styles.input} placeholder="Enter title" placeholderTextColor="#6b7280" value={title} onChangeText={setTitle} />
-                    </View>
-                    
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.modalInputLabel}>AMOUNT (₹)</Text>
-                      <TextInput style={styles.input} placeholder="0.00" placeholderTextColor="#6b7280" keyboardType="numeric" value={amount} onChangeText={setAmount} />
-                    </View>
+                    {editingId ? (
+                      <>
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.modalInputLabel}>FEE TITLE (e.g. Tution, Hostel)</Text>
+                          <TextInput style={styles.input} placeholder="Enter title" placeholderTextColor="#6b7280" value={title} onChangeText={setTitle} />
+                        </View>
+                        
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.modalInputLabel}>AMOUNT (₹)</Text>
+                          <TextInput style={styles.input} placeholder="0.00" placeholderTextColor="#6b7280" keyboardType="numeric" value={amount} onChangeText={setAmount} />
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={[styles.modalInputLabel, { marginBottom: 16, fontSize: 12, color: colors.adminPrimary }]}>ENTER AMOUNTS FOR APPLICABLE FEES</Text>
+                        <View style={styles.multiInputRow}>
+                          <View style={[styles.inputGroup, { flex: 1 }]}>
+                            <Text style={styles.modalInputLabel}>TUITION FEE (₹)</Text>
+                            <TextInput style={styles.input} placeholder="0" placeholderTextColor="#6b7280" keyboardType="numeric" onChangeText={(val) => setMultiFees({...multiFees, tuition: val})} value={multiFees.tuition} />
+                          </View>
+                          <View style={{ width: 12 }} />
+                          <View style={[styles.inputGroup, { flex: 1 }]}>
+                            <Text style={styles.modalInputLabel}>REGISTRATION (₹)</Text>
+                            <TextInput style={styles.input} placeholder="0" placeholderTextColor="#6b7280" keyboardType="numeric" onChangeText={(val) => setMultiFees({...multiFees, registration: val})} value={multiFees.registration} />
+                          </View>
+                        </View>
+
+                        <View style={styles.multiInputRow}>
+                          <View style={[styles.inputGroup, { flex: 1 }]}>
+                            <Text style={styles.modalInputLabel}>HOSTEL FEE (₹)</Text>
+                            <TextInput style={styles.input} placeholder="0" placeholderTextColor="#6b7280" keyboardType="numeric" onChangeText={(val) => setMultiFees({...multiFees, hostel: val})} value={multiFees.hostel} />
+                          </View>
+                          <View style={{ width: 12 }} />
+                          <View style={[styles.inputGroup, { flex: 1 }]}>
+                            <Text style={styles.modalInputLabel}>OTHER FEES (₹)</Text>
+                            <TextInput style={styles.input} placeholder="0" placeholderTextColor="#6b7280" keyboardType="numeric" onChangeText={(val) => setMultiFees({...multiFees, other: val})} value={multiFees.other} />
+                          </View>
+                        </View>
+                      </>
+                    )}
 
                     <View style={styles.dropdownRow}>
                       <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -343,4 +400,5 @@ const styles = StyleSheet.create({
   picker: { color: colors.white, height: 50 },
   submitBtn: { backgroundColor: colors.adminPrimary, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 10, marginBottom: 30 },
   submitBtnText: { color: colors.white, fontSize: 16, fontWeight: '800' },
+  multiInputRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
 });
