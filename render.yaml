@@ -2,6 +2,7 @@ services:
   - type: web
     name: edu-fee-backend
     env: node
+    plan: free
     rootDir: Backend
     buildCommand: npm install
     startCommand: npm start
