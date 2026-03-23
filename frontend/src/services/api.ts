@@ -13,8 +13,8 @@ const getBaseUrl = () => {
       return 'http://localhost:5000/api';
     }
     // For Mobile development (Android Emulator, iOS Simulator, or Physical Device)
-    // Using current machine IP: 10.102.57.97
-    return 'http://10.102.57.97:5000/api';
+    // Using current machine IP: 10.113.71.97
+    return 'http://10.113.71.97:5000/api';
   }
   // Production URL (update when deployed)
   return 'https://your-production-api.com/api';
