@@ -23,11 +23,6 @@ jobs:
       - name: 🏗 Setup EAS
         run: npm install -g eas-cli
 
-      - name: 🏗 Expo Login
-        run: eas login --non-interactive
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
       - name: 📦 Install dependencies
         run: |
           cd frontend
