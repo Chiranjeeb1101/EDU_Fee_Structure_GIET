@@ -27,4 +27,9 @@ router.get('/notifications', asyncHandler(adminController.getNotifications));
 // ─── Admin Management ───────────────────────────────────────────
 router.post('/users', asyncHandler(adminController.createAdmin));
 
+// ─── Email ──────────────────────────────────────────────────────
+const emailController = require('../controllers/email.controller');
+router.post('/email/reminder', asyncHandler(emailController.sendReminders));
+router.post('/email/broadcast', asyncHandler(emailController.sendBroadcast));
+
 module.exports = router;

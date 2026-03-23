@@ -239,6 +239,38 @@ class PaymentService {
     console.log(
       `✅ Payment ${payment.id} verified. Paid: ₹${newPaidFee}, Remaining: ₹${Math.max(0, newRemainingFee)}`
     );
+
+    // 4. Send confirmation email
+    try {
+      const emailService = require('./email.service');
+      const { data: userData } = await supabase
+        .from('users')
+        .select('full_name, email, personal_email')
+        .eq('id', session.metadata?.user_id)
+        .single();
+
+      const { data: studentData } = await supabase
+        .from('students')
+        .select('college_id_number, stream, year')
+        .eq('id', payment.student_id)
+        .single();
+
+      const recipientEmail = userData?.personal_email || userData?.email;
+      if (recipientEmail) {
+        await emailService.sendPaymentConfirmation({
+          to: recipientEmail,
+          studentName: userData?.full_name || 'Student',
+          collegeId: studentData?.college_id_number || 'N/A',
+          amount: payment.amount,
+          remainingFee: Math.max(0, newRemainingFee),
+          paymentId: payment.id,
+          stream: studentData?.stream,
+          year: studentData?.year,
+        });
+      }
+    } catch (emailErr) {
+      console.error('📧 Confirmation email failed (non-critical):', emailErr.message);
+    }
   }
 
   /**

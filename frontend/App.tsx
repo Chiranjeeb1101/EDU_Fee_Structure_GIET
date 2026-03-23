@@ -32,6 +32,7 @@ import { AdminSettingsScreen } from './src/screens/admin/AdminSettingsScreen';
 import { AdminAddStudentScreen } from './src/screens/admin/AdminAddStudentScreen';
 import { AdminNotificationsScreen } from './src/screens/admin/AdminNotificationsScreen';
 import { AdminResetRequestsScreen } from './src/screens/admin/AdminResetRequestsScreen';
+import { AdminEmailScreen } from './src/screens/admin/AdminEmailScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BottomNav } from './src/components/navigation/BottomNav';
 import { AdminBottomNav } from './src/components/navigation/AdminBottomNav';
@@ -66,6 +67,7 @@ export type RootStackParamList = {
   AdminPayments: undefined;
   AdminSettings: undefined;
   AdminResetRequests: undefined;
+  AdminEmail: undefined;
   Dashboard: undefined;
   History: undefined;
   Receipts: undefined;
@@ -179,6 +181,7 @@ function AppContent() {
                     <Stack.Screen name="AdminPayments" component={AdminPaymentsScreen} />
                     <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
                     <Stack.Screen name="AdminResetRequests" component={AdminResetRequestsScreen} />
+                    <Stack.Screen name="AdminEmail" component={AdminEmailScreen} />
                   </>
                 ) : (
                   <>

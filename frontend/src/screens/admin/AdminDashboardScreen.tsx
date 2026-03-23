@@ -140,6 +140,12 @@ export const AdminDashboardScreen = () => {
                   color={colors.success} 
                   onPress={() => (navigation as any).navigate('AdminAnalytics')} 
                 />
+                <QuickAction 
+                  icon="email" 
+                  label="Email Center" 
+                  color="#f59e0b" 
+                  onPress={() => (navigation as any).navigate('AdminEmail')} 
+                />
               </ScrollView>
             </View>
 

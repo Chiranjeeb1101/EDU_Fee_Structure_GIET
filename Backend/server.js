@@ -54,7 +54,7 @@ app.use((err, _req, res, _next) => {
 });
 
 // ─── Start server ──────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT} (all interfaces)`);
   console.log(`📡 Health check → http://localhost:${PORT}/api/health`);
 });
