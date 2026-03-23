@@ -4,8 +4,9 @@
   "description": "Smart Fee Management System — multi-tenant backend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "predev": "node ../frontend/scripts/update-ip.js",
+    "start": "npm run predev && node server.js",
+    "dev": "npm run predev && nodemon server.js"
   },
   "keywords": [],
   "author": "",
