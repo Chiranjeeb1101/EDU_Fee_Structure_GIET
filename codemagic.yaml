@@ -20,7 +20,7 @@ workflows:
         script: |
           cd frontend
           # Using EXPO_TOKEN from environment variables
-          eas build -p android --profile preview --local --non-interactive
+          EXPO_TOKEN=$EXPO_TOKEN eas build -p android --profile preview --local --non-interactive
     artifacts:
       - frontend/*.apk
     publishing:
