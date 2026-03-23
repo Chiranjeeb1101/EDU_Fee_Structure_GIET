@@ -16,8 +16,8 @@ const getBaseUrl = () => {
     // Using current machine IP: 10.113.71.97
     return 'http://10.113.71.97:5000/api';
   }
-  // Production URL (update when deployed)
-  return 'https://your-production-api.com/api';
+  // Production URL: Use environment variable if available, fallback to a placeholder
+  return process.env.EXPO_PUBLIC_BACKEND_URL || 'https://your-production-api.com/api';
 };
 
 // ─── Axios Instance ─────────────────────────────────────────────
