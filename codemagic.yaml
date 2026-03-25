@@ -1,14 +1,14 @@
 workflows:
   android-apk-build:
     name: Build Android APK
-    instance_type: linux
+    instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
-      node: 20
+      node: 20.x
       groups:
-        - expo_credentials # User must add EXPO_TOKEN here in Codemagic UI
+        - expo_credentials # Add EXPO_TOKEN here in Codemagic UI
       vars:
-        ANDROID_SDK_ROOT: /opt/android-sdk-linux
+        PACKAGE_NAME: "com.chiranjeeb.frontend"
     scripts:
       - name: Install EAS CLI
         script: npm install -g eas-cli
@@ -16,14 +16,13 @@ workflows:
         script: |
           cd frontend
           npm install
-      - name: Build Android APK (Local)
+      - name: Build Android APK
         script: |
           cd frontend
-          # Using EXPO_TOKEN from environment variables
-          EXPO_TOKEN=$EXPO_TOKEN eas build -p android --profile preview --local --non-interactive
+          eas build -p android --profile preview --local --non-interactive
     artifacts:
       - frontend/*.apk
     publishing:
       email:
         recipients:
-          - chiranjeeb1101@gmail.com
+          - chiranjeeb1101@gmail.com # Suggested based on repo name

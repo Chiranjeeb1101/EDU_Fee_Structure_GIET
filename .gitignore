@@ -40,3 +40,6 @@ obj/
 # Misc
 screen_list.txt
 stitch_welcome_extract/
+
+# Ignore duplicate copy folder
+EDU_Fee_Structure_GIET/
