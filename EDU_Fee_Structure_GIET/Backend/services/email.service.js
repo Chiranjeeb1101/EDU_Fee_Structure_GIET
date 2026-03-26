@@ -1,4 +1,10 @@
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+// Force IPv4 resolution to prevent ENETUNREACH in Render/Docker environments
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 class EmailService {
   constructor() {
