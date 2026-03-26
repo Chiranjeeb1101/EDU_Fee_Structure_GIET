@@ -22,7 +22,10 @@ class EmailService {
     }
 
     this.transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // STARTTLS
+      requireTLS: true,
       auth: { user: email, pass },
     });
 
