@@ -1,0 +1,42 @@
+name: Build Android APK
+# Trigger: Token updated by user
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🏗 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 🏗 Setup EAS
+        run: npm install -g eas-cli
+
+      - name: 📦 Install dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: 🚀 Build APK
+        run: |
+          cd frontend
+          eas build -p android --profile preview --local --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📤 Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: frontend/*.apk

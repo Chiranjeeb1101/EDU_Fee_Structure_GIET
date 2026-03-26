@@ -7,10 +7,15 @@ import { Platform } from 'react-native';
 // iOS simulator and web use localhost directly
 // For physical devices via Expo tunnel, use your machine's LAN IP or ngrok URL
 const getBaseUrl = () => {
+  // If a production/hosted URL is explicitly provided in .env, use it
+  if (process.env.EXPO_PUBLIC_BACKEND_URL) {
+    return process.env.EXPO_PUBLIC_BACKEND_URL;
+  }
+
   if (__DEV__) {
     // For Web development
     if (Platform.OS === 'web') {
-      return 'http://10.102.57.101:5000/api';
+      return 'http://localhost:5000/api';
     }
     // For Mobile development (using ADB reverse tunnel)
     // This allows the physical phone to reach localhost on your PC via USB
@@ -20,14 +25,14 @@ const getBaseUrl = () => {
     // For iOS Simulator or others
     return 'http://10.102.57.101:5000/api';
   }
-  // Production URL: Use environment variable if available, fallback to a placeholder
-  return process.env.EXPO_PUBLIC_BACKEND_URL || 'https://your-production-api.com/api';
+  // Production fallback
+  return 'https://your-production-api.com/api';
 };
 
 // ─── Axios Instance ─────────────────────────────────────────────
 const api = axios.create({
   baseURL: getBaseUrl(),
-  timeout: 15000,
+  timeout: 60000, // Increased to 60s to handle Render's free tier slow start
   headers: {
     'Content-Type': 'application/json',
   },

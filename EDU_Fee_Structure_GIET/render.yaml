@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: edu-fee-backend
+    env: node
+    plan: free
+    rootDir: Backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: DEFAULT_COLLEGE_ID
+        sync: false
+      - key: SMTP_EMAIL
+        sync: false
+      - key: SMTP_APP_PASSWORD
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+
+  - type: web
+    name: edu-fee-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && npx expo export
+    staticPublishPath: dist
+    envVars:
+      - key: EXPO_PUBLIC_BACKEND_URL
+        sync: false
