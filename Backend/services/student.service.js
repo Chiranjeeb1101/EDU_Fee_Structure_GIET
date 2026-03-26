@@ -128,6 +128,32 @@ class StudentService {
     }
     return true;
   }
+
+  async getCalendarEvents(userId) {
+    // 1. Get student's college_id
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('college_id')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      throw Object.assign(new Error('User or college not found.'), { statusCode: 404 });
+    }
+
+    // 2. Fetch events for this college
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('college_id', user.college_id)
+      .order('event_date', { ascending: true });
+
+    if (error) {
+      throw Object.assign(new Error('Failed to fetch calendar events.'), { statusCode: 500 });
+    }
+
+    return data;
+  }
 }
 
 module.exports = new StudentService();

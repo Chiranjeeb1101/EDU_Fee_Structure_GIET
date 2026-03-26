@@ -10,8 +10,8 @@ class EmailService {
     const email = process.env.SMTP_EMAIL;
     const pass  = process.env.SMTP_APP_PASSWORD;
 
-    if (!email || !pass) {
-      console.warn('⚠️  SMTP_EMAIL or SMTP_APP_PASSWORD not set — email service disabled.');
+    if (!email || !pass || email.includes('your-gmail')) {
+      console.warn('⚠️  Email service using placeholder or disabled.');
       return;
     }
 
@@ -64,7 +64,9 @@ class EmailService {
 
   // ─── Payment Confirmation Email ─────────────────────────────────
   async sendPaymentConfirmation({ to, studentName, collegeId, amount, remainingFee, paymentId, stream, year }) {
-    if (!this.transporter) return null;
+    if (!this.transporter) {
+      return { success: false, error: 'SMTP not configured in .env' };
+    }
 
     const html = this._wrapHtml(`
       <div class="header">
@@ -115,7 +117,9 @@ class EmailService {
 
   // ─── Fee Reminder Email ─────────────────────────────────────────
   async sendFeeReminder({ to, studentName, collegeId, remainingFee, stream, year, dueDate }) {
-    if (!this.transporter) return null;
+    if (!this.transporter) {
+      return { success: false, error: 'SMTP not configured in .env' };
+    }
 
     const dueLine = dueDate
       ? `<p style="color:#f59e0b;font-weight:600">⏰ Due Date: ${dueDate}</p>`
@@ -161,7 +165,9 @@ class EmailService {
 
   // ─── Admin Broadcast Email ──────────────────────────────────────
   async sendBroadcast({ to, studentName, subject, message }) {
-    if (!this.transporter) return null;
+    if (!this.transporter) {
+      return { success: false, error: 'SMTP not configured in .env' };
+    }
 
     // Convert newlines to <br> for HTML rendering
     const htmlMessage = message.replace(/\n/g, '<br>');

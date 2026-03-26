@@ -27,10 +27,11 @@ if (fs.existsSync(apiPath)) {
   let content = fs.readFileSync(apiPath, 'utf8');
   // Regex to find: // Using current machine IP: XXX.XXX.XXX.XXX
   const ipCommentRegex = /(\/\/ Using current machine IP: )(\d+\.\d+\.\d+\.\d+|localhost)/g;
-  const urlRegex = /(return 'http:\/\/)((\d+\.\d+\.\d+\.\d+|localhost):5000\/api')/g;
+  // Regex to find only the URL inside the Web check to avoid breaking the ADB reverse tunnel
+  const webUrlRegex = /(Platform\.OS === 'web'\) \{\s+return 'http:\/\/)((\d+\.\d+\.\d+\.\d+|localhost):5000\/api')/g;
 
   content = content.replace(ipCommentRegex, `$1${currentIp}`);
-  content = content.replace(urlRegex, `$1${currentIp}:5000/api'`);
+  content = content.replace(webUrlRegex, `$1${currentIp}:5000/api'`);
 
   fs.writeFileSync(apiPath, content);
   console.log(`✅ Updated frontend/src/services/api.ts with ${currentIp}`);

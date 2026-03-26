@@ -30,7 +30,7 @@ const ProfileListItem = ({ icon, title, subtitle, colorClass, showToggle, toggle
 
 export const ProfileScreen = () => {
   const navigation = useNavigation();
-  const { logout, user, updateUser } = useAuth();
+  const { logout, user, updateUser, profileImageTimestamp } = useAuth();
   
   const [isUpdating, setIsUpdating] = useState(false);
   
@@ -200,7 +200,7 @@ export const ProfileScreen = () => {
               <View style={styles.avatarGlow} />
               <View style={styles.avatarBorder}>
                 <Image 
-                  source={{ uri: editImage || user?.profile_picture || 'https://lh3.googleusercontent.com/aida-public/AB6AXuAP7c6BKhlg06MLobhj0M2A7aFjdsRXxVarCJoKlNsWM69F4glA_7JmXiOr86Is6g70T3DWr2XUvQK5JF0gMKLqTnC8UpACxoqSMF57ee8uFohF0juMeRgX5Vs_R0ASSMl9VdiWbL31t2Di2XVUIdLX2gm7x30ykuZQmjZS195IF9VBecZyLR8d_UXVknhN0CLwIvBdnTHwzjGeCau0dcM5XqEimb3wzc9S_kX6BDbc3PIdy48DR3qsjv8m5o1O8hd00g9LI8mOWJw' }} 
+                  source={{ uri: editImage || (user?.profile_picture ? (user.profile_picture.startsWith('data:image') ? user.profile_picture : `${user.profile_picture}?t=${profileImageTimestamp}`) : 'https://lh3.googleusercontent.com/aida-public/AB6AXuAP7c6BKhlg06MLobhj0M2A7aFjdsRXxVarCJoKlNsWM69F4glA_7JmXiOr86Is6g70T3DWr2XUvQK5JF0gMKLqTnC8UpACxoqSMF57ee8uFohF0juMeRgX5Vs_R0ASSMl9VdiWbL31t2Di2XVUIdLX2gm7x30ykuZQmjZS195IF9VBecZyLR8d_UXVknhN0CLwIvBdnTHwzjGeCau0dcM5XqEimb3wzc9S_kX6BDbc3PIdy48DR3qsjv8m5o1O8hd00g9LI8mOWJw') }} 
                   style={styles.avatarImg} 
                 />
               </View>

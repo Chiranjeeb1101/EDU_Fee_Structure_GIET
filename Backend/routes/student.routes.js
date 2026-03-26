@@ -15,5 +15,6 @@ router.put('/notifications/:id/read', asyncHandler(studentController.markNotific
 router.get('/documents', asyncHandler(studentController.getDocuments));
 router.post('/documents', upload.single('file'), asyncHandler(studentController.addDocument));
 router.delete('/documents/:id', asyncHandler(studentController.deleteDocument));
+router.get('/calendar-events', asyncHandler(studentController.getCalendarEvents));
 
 module.exports = router;

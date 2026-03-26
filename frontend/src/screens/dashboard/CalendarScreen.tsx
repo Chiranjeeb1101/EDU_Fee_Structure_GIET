@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import studentService, { CalendarEvent } from '../../services/studentService';
 
 const { width } = Dimensions.get('window');
 
@@ -40,6 +41,8 @@ export const CalendarScreen = () => {
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate());
   const [reminders, setReminders] = useState<Record<string, string>>({}); // dateKey -> notificationId
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
 
   // Persistence Key
@@ -47,7 +50,20 @@ export const CalendarScreen = () => {
 
   useEffect(() => {
     loadReminders();
+    fetchEvents();
   }, []);
+
+  const fetchEvents = async () => {
+    try {
+      setIsLoading(true);
+      const data = await studentService.getCalendarEvents();
+      setEvents(data);
+    } catch (e) {
+      console.error('Failed to fetch calendar events');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const loadReminders = async () => {
     try {
@@ -261,7 +277,8 @@ export const CalendarScreen = () => {
               {prevDays.map(d => <CalendarDay key={`p-${d}`} day={d.toString()} isPrevMonth />)}
               {currDays.map(d => {
                 const dateKey = getDateKey(d);
-                const isCritical = (d === 15);
+                const dayEvents = events.filter(e => e.event_date === dateKey);
+                const isCritical = dayEvents.some(e => e.type === 'critical');
                 const hasReminder = !!reminders[dateKey];
                 return (
                   <CalendarDay 
@@ -282,25 +299,39 @@ export const CalendarScreen = () => {
             <View style={styles.detailsSection}>
                <View style={styles.detailsHeader}>
                  <Text style={styles.detailsTitle}>{selectedDay} {monthStr} Details</Text>
-                 {selectedDay === 15 && monthIndex === 7 && (
-                   <View style={styles.criticalBadge}>
-                     <MaterialIcons name="warning" size={12} color={colors.error} style={{ marginRight: 4 }} />
-                     <Text style={styles.criticalText}>CRITICAL DEADLINE</Text>
-                   </View>
-                 )}
                </View>
 
-               <View style={styles.detailsCard}>
-                  <View style={styles.detailsCardTop}>
-                    <View>
-                      <Text style={styles.cardLabel}>CATEGORY</Text>
-                      <Text style={styles.cardValTitle}>{selectedDay === 15 ? 'Pending Due' : 'Scheduled Task'}</Text>
+                <View style={styles.detailsCard}>
+                  {events
+                    .filter(e => e.event_date === getDateKey(selectedDay))
+                    .map((evt, idx) => (
+                      <View key={evt.id} style={{ marginBottom: idx < events.filter(e => e.event_date === getDateKey(selectedDay)).length - 1 ? 16 : 0 }}>
+                        <View style={styles.detailsCardTop}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.cardLabel}>CATEGORY</Text>
+                            <Text style={styles.cardValTitle}>{evt.title}</Text>
+                            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>{evt.description}</Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={styles.cardLabel}>AMOUNT</Text>
+                            <Text style={styles.cardValAmount}>{evt.amount ? `₹${evt.amount.toLocaleString()}` : '—'}</Text>
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                  
+                  {events.filter(e => e.event_date === getDateKey(selectedDay)).length === 0 && (
+                    <View style={styles.detailsCardTop}>
+                      <View>
+                        <Text style={styles.cardLabel}>CATEGORY</Text>
+                        <Text style={styles.cardValTitle}>Generic Task</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={styles.cardLabel}>AMOUNT</Text>
+                        <Text style={styles.cardValAmount}>—</Text>
+                      </View>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.cardLabel}>AMOUNT</Text>
-                      <Text style={styles.cardValAmount}>{selectedDay === 15 ? '₹15,000' : '—'}</Text>
-                    </View>
-                  </View>
+                  )}
 
                   <View style={styles.detailsCardActions}>
                     <TouchableOpacity 

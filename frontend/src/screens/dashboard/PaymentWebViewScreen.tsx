@@ -1,13 +1,13 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, TouchableOpacity, Platform, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 
 export const PaymentWebViewScreen = () => {
-  const navigation = useNavigation();
-  const route = useRoute();
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { checkoutUrl } = route.params as { checkoutUrl: string };
   
   const [isLoading, setIsLoading] = useState(true);
@@ -18,11 +18,11 @@ export const PaymentWebViewScreen = () => {
     const { url, title } = navState;
     if (title) setPageTitle(title);
     
-    // Check if user landed on our success page
-    if (url.includes('/api/payments/success')) {
+    // Check if user landed on our success page or title indicates success
+    if (url.includes('/api/payments/success') || (title && title.toLowerCase().includes('payment successful'))) {
       // Payment was successful — go back to dashboard after short delay
       setTimeout(() => {
-        navigation.navigate('MainTabs' as any, { screen: 'Dashboard' });
+        (navigation as any).navigate('MainTabs', { screen: 'Dashboard' });
       }, 3000); // Let user see success page for 3 seconds
     }
     
@@ -31,6 +31,23 @@ export const PaymentWebViewScreen = () => {
       setTimeout(() => {
         navigation.goBack();
       }, 2000);
+    }
+  };
+
+  const manualCheckStatus = () => {
+    // If the title already looks successful, just go back
+    if (pageTitle.toLowerCase().includes('successful')) {
+      navigation.navigate('MainTabs' as any, { screen: 'Dashboard' });
+    } else {
+      // Otherwise, assume completed if the user is clicking this on a Stripe completion screen
+      Alert.alert(
+        "Check Payment",
+        "If you have completed the payment, your dashboard will update. Return now?",
+        [
+          { text: "Wait", style: "cancel" },
+          { text: "Return to App", onPress: () => (navigation as any).navigate('MainTabs', { screen: 'Dashboard' }) }
+        ]
+      );
     }
   };
 
@@ -50,9 +67,9 @@ export const PaymentWebViewScreen = () => {
             <MaterialIcons name="lock" size={14} color={colors.success} />
             <Text style={styles.headerTitle} numberOfLines={1}>{pageTitle}</Text>
           </View>
-          <View style={styles.headerRight}>
-            <MaterialIcons name="verified-user" size={18} color={colors.success} />
-          </View>
+          <TouchableOpacity onPress={manualCheckStatus} style={styles.statusBtn}>
+            <Text style={styles.statusBtnText}>DONE?</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Secure Badge */}
@@ -129,8 +146,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: 6,
   },
-  headerRight: {
-    padding: 8,
+  statusBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  statusBtnText: {
+    color: colors.success,
+    fontSize: 10,
+    fontWeight: '800',
   },
   secureBanner: {
     flexDirection: 'row',

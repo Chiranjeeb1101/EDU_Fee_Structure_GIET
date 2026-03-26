@@ -48,7 +48,7 @@ const DeadlineTask = ({ dateNum, dateMonth, title, subtitle, amount, timeLabel, 
 
 export const DashboardScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user } = useAuth();
+  const { user, profileImageTimestamp } = useAuth();
   
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -228,7 +228,7 @@ export const DashboardScreen = () => {
               >
                  <Text style={styles.profileName}>{user?.full_name?.split(' ')[0] || 'Student'}</Text>
                 <Image 
-                  source={{ uri: user?.profile_picture || 'https://lh3.googleusercontent.com/aida-public/AB6AXuBMe6_91oLoeN243c8bK58RQU7-i4a7SQ1kaBILzLHQRMEPGIHLn_jMwJ5hRGtUrzj99fKhh6ReA78MsjTreR0iJmwpqBiKXVuYW6ZV_CDRp52TO3UrVuqEKFfqKgXRvgIUqVWcLjX_8E8VzSpKNxeyo88I6AMuTTPOa1mPFFLFLGq4PKhVVyhLpaPxPffWSgqIRt3CyQinLQWqe1fIg5CG5XMPoeQvaOIWx97AtFzLKamFywaAUT11_Ur2pido-qGJHdc_CsGpPAg' }} 
+                  source={{ uri: (user?.profile_picture ? (user.profile_picture.startsWith('data:image') ? user.profile_picture : `${user.profile_picture}?t=${profileImageTimestamp}`) : 'https://lh3.googleusercontent.com/aida-public/AB6AXuBMe6_91oLoeN243c8bK58RQU7-i4a7SQ1kaBILzLHQRMEPGIHLn_jMwJ5hRGtUrzj99fKhh6ReA78MsjTreR0iJmwpqBiKXVuYW6ZV_CDRp52TO3UrVuqEKFfqKgXRvgIUqVWcLjX_8E8VzSpKNxeyo88I6AMuTTPOa1mPFFLFLGq4PKhVVyhLpaPxPffWSgqIRt3CyQinLQWqe1fIg5CG5XMPoeQvaOIWx97AtFzLKamFywaAUT11_Ur2pido-qGJHdc_CsGpPAg') }} 
                   style={styles.profileImage} 
                 />
               </TouchableOpacity>

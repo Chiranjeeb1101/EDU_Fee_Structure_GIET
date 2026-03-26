@@ -5,39 +5,21 @@ import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import authService from '../../services/authService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../context/AuthContext';
 
 const SecurityScreen = () => {
   const navigation = useNavigation();
+  const { isTwoFactorEnabled, toggleTwoFactor } = useAuth();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
-  // Load 2FA state
-  React.useEffect(() => {
-    const load2FA = async () => {
-      const saved = await AsyncStorage.getItem('user_settings');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setTwoFactorEnabled(parsed.twoFactorEnabled ?? false);
-      }
-    };
-    load2FA();
-  }, []);
+  // 2FA state is now managed globally by AuthContext
 
   const handleToggle2FA = async () => {
-    const newVal = !twoFactorEnabled;
-    setTwoFactorEnabled(newVal);
-    try {
-      const current = await AsyncStorage.getItem('user_settings');
-      const settings = current ? JSON.parse(current) : {};
-      settings.twoFactorEnabled = newVal;
-      await AsyncStorage.setItem('user_settings', JSON.stringify(settings));
-      Alert.alert(newVal ? "2FA Enabled" : "2FA Disabled", `Two-factor authentication has been ${newVal ? 'enabled' : 'disabled'} for your account.`);
-    } catch (e) {
-      console.error(e);
-    }
+    await toggleTwoFactor(!isTwoFactorEnabled);
+    Alert.alert(!isTwoFactorEnabled ? "2FA Enabled" : "2FA Disabled", `Two-factor authentication has been ${!isTwoFactorEnabled ? 'enabled' : 'disabled'} for your account.`);
   };
 
   const handleChangePassword = async () => {
@@ -99,8 +81,8 @@ const SecurityScreen = () => {
                   <Text style={styles.cardSublabel}>Secure your account with an extra layer of protection.</Text>
                 </View>
                 <TouchableOpacity onPress={handleToggle2FA} activeOpacity={0.8}>
-                   <View style={[styles.toggleBg, twoFactorEnabled ? styles.toggleBgActive : styles.toggleBgInactive]}>
-                      <View style={[styles.toggleThumb, twoFactorEnabled && styles.toggleThumbActive]} />
+                   <View style={[styles.toggleBg, isTwoFactorEnabled ? styles.toggleBgActive : styles.toggleBgInactive]}>
+                      <View style={[styles.toggleThumb, isTwoFactorEnabled && styles.toggleThumbActive]} />
                    </View>
                 </TouchableOpacity>
               </View>

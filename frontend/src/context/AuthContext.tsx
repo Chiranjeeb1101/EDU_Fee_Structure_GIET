@@ -15,8 +15,11 @@ interface AuthContextType {
   completeRegistration: (token: string, user: UserData) => Promise<void>;
   isBioEnabled: boolean;
   isBioVerified: boolean;
+  isTwoFactorEnabled: boolean;
+  profileImageTimestamp: number;
   setBioVerified: (verified: boolean) => void;
   toggleBiometrics: (enabled: boolean) => Promise<void>;
+  toggleTwoFactor: (enabled: boolean) => Promise<void>;
 }
 
 // ─── Context ────────────────────────────────────────────────────
@@ -32,8 +35,11 @@ const AuthContext = createContext<AuthContextType>({
   completeRegistration: async () => {},
   isBioEnabled: false,
   isBioVerified: false,
+  isTwoFactorEnabled: false,
+  profileImageTimestamp: Date.now(),
   setBioVerified: () => {},
   toggleBiometrics: async () => {},
+  toggleTwoFactor: async () => {},
 });
 
 import api, { setOnUnauthorized } from '../services/api';
@@ -44,6 +50,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [isBioEnabled, setIsBioEnabled] = useState(false);
   const [isBioVerified, setIsBioVerified] = useState(false);
+  const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(false);
+  const [profileImageTimestamp, setProfileImageTimestamp] = useState(Date.now());
   const [isLoading, setIsLoading] = useState(true);
 
   // Set up global 401 handler
@@ -89,6 +97,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Load biometric preference
         const bioPref = await AsyncStorage.getItem('is_bio_enabled');
         setIsBioEnabled(bioPref === 'true');
+
+        // Load 2FA preference
+        const savedSettings = await AsyncStorage.getItem('user_settings');
+        if (savedSettings) {
+          const parsed = JSON.parse(savedSettings);
+          setIsTwoFactorEnabled(parsed.twoFactorEnabled ?? false);
+        }
       } catch (error) {
         console.warn('Failed to load session:', error);
       } finally {
@@ -101,6 +116,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const toggleBiometrics = async (enabled: boolean) => {
     setIsBioEnabled(enabled);
     await AsyncStorage.setItem('is_bio_enabled', enabled ? 'true' : 'false');
+  };
+
+  const toggleTwoFactor = async (enabled: boolean) => {
+    setIsTwoFactorEnabled(enabled);
+    try {
+      const current = await AsyncStorage.getItem('user_settings');
+      const settings = current ? JSON.parse(current) : {};
+      settings.twoFactorEnabled = enabled;
+      await AsyncStorage.setItem('user_settings', JSON.stringify(settings));
+    } catch (e) {
+      console.error('Failed to save 2FA setting', e);
+    }
   };
 
   const login = async (collegeId: string, password: string, remember: boolean) => {
@@ -143,6 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const result = await authService.updateProfile(payload);
       if (result.success) {
         setUser(result.user);
+        setProfileImageTimestamp(Date.now());
         await AsyncStorage.setItem('user_data', JSON.stringify(result.user));
         return { success: true, message: 'Profile updated successfully' };
       }
@@ -192,8 +220,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         completeRegistration,
         isBioEnabled,
         isBioVerified,
+        isTwoFactorEnabled,
+        profileImageTimestamp,
         setBioVerified: setIsBioVerified,
         toggleBiometrics,
+        toggleTwoFactor,
       }}
     >
       {children}

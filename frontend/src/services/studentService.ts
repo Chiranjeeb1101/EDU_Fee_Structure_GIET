@@ -15,6 +15,15 @@ export interface PaymentHistoryItem {
   created_at: string;
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  event_date: string;
+  amount?: number;
+  type: 'info' | 'warning' | 'critical' | 'success';
+}
+
 export interface DashboardData {
   profile_complete: boolean;
   fee_status: FeeStatus;
@@ -75,6 +84,11 @@ const studentService = {
   deleteDocument: async (id: string) => {
     const response = await api.delete(`/students/documents/${id}`);
     return response.data;
+  },
+
+  getCalendarEvents: async (): Promise<CalendarEvent[]> => {
+    const response = await api.get('/students/calendar-events');
+    return response.data.data;
   }
 };
 

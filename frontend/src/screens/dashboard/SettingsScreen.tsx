@@ -26,7 +26,7 @@ const SettingsItem = ({ icon, title, showToggle, toggleActive, onToggle, colorCl
 
 export const SettingsScreen = () => {
   const navigation = useNavigation();
-  const { logout, user, isBioEnabled, toggleBiometrics } = useAuth(); // fetch user for display
+  const { logout, user, isBioEnabled, toggleBiometrics, isTwoFactorEnabled, toggleTwoFactor, profileImageTimestamp } = useAuth(); // fetch user for display
 
   // Toggle States
   const [reminders, setReminders] = React.useState(true);
@@ -130,7 +130,7 @@ export const SettingsScreen = () => {
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarGlow} />
               <Image 
-                source={{ uri: user?.profile_picture || 'https://lh3.googleusercontent.com/aida-public/AB6AXuBMe6_91oLoeN243c8bK58RQU7-i4a7SQ1kaBILzLHQRMEPGIHLn_jMwJ5hRGtUrzj99fKhh6ReA78MsjTreR0iJmwpqBiKXVuYW6ZV_CDRp52TO9UrVuqEKFfqKgXRvgIUqVWcLjX_8E8VzSpKNxeyo88I6AMuTTPOa1mPFFLFLGq4PKhVVyhLpaPxPffWSgqIRt3CyQinLQWqe1fIg5CG5XMPoeQvaOIWx97AtFzLKamFywaAUT11_Ur2pido-qGJHdc_CsGpPAg' }} 
+                source={{ uri: (user?.profile_picture ? (user.profile_picture.startsWith('data:image') ? user.profile_picture : `${user.profile_picture}?t=${profileImageTimestamp}`) : 'https://lh3.googleusercontent.com/aida-public/AB6AXuBMe6_91oLoeN243c8bK58RQU7-i4a7SQ1kaBILzLHQRMEPGIHLn_jMwJ5hRGtUrzj99fKhh6ReA78MsjTreR0iJmwpqBiKXVuYW6ZV_CDRp52TO9UrVuqEKFfqKgXRvgIUqVWcLjX_8E8VzSpKNxeyo88I6AMuTTPOa1mPFFLFLGq4PKhVVyhLpaPxPffWSgqIRt3CyQinLQWqe1fIg5CG5XMPoeQvaOIWx97AtFzLKamFywaAUT11_Ur2pido-qGJHdc_CsGpPAg') }} 
                 style={styles.avatarImg} 
               />
               <View style={styles.editBadge}>
@@ -144,21 +144,36 @@ export const SettingsScreen = () => {
             </View>
           </TouchableOpacity>
 
-          {/* Account Settings */}
+          {/* Account & Security Quick Access */}
           <View style={styles.sectionBlock}>
-            <Text style={styles.sectionHeader}>ACCOUNT SETTINGS</Text>
+            <Text style={styles.sectionHeader}>SECURITY & ACCOUNT</Text>
             <View style={styles.grid2Col}>
-              <TouchableOpacity style={[styles.glassCard, styles.colSpan2]} activeOpacity={0.8} onPress={() => Alert.alert("Linked Accounts", "Securely connect your institutional or personal bank accounts for instant fee settlements.")}>
+              <TouchableOpacity style={[styles.glassCard, styles.colSpan2]} activeOpacity={0.8} onPress={() => (navigation as any).navigate('Security')}>
                 <View style={styles.accLeft}>
-                  <View style={[styles.iconBox, { backgroundColor: 'rgba(144, 171, 255, 0.1)' }]}>
-                    <MaterialIcons name="account-balance" size={24} color={colors.primary} />
+                  <View style={[styles.iconBox, { backgroundColor: 'rgba(255, 113, 108, 0.1)' }]}>
+                    <MaterialIcons name="security" size={24} color={colors.error} />
                   </View>
                   <View>
-                    <Text style={styles.cardTitle}>Linked Bank Accounts</Text>
-                    <Text style={styles.cardSub}>2 Accounts connected</Text>
+                    <Text style={styles.cardTitle}>Change Password</Text>
+                    <Text style={styles.cardSub}>Update your account password</Text>
                   </View>
                 </View>
                 <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.glassCard, styles.colSpan2]} activeOpacity={0.8} onPress={() => toggleTwoFactor(!isTwoFactorEnabled)}>
+                <View style={styles.accLeft}>
+                  <View style={[styles.iconBox, { backgroundColor: 'rgba(71, 196, 255, 0.1)' }]}>
+                    <MaterialIcons name="verified-user" size={24} color={colors.tertiary} />
+                  </View>
+                  <View>
+                    <Text style={styles.cardTitle}>Two-Factor Authentication</Text>
+                    <Text style={styles.cardSub}>{isTwoFactorEnabled ? 'Securely Enabled' : 'Disabled - Enable for safety'}</Text>
+                  </View>
+                </View>
+                <View style={[styles.toggleBg, isTwoFactorEnabled && styles.toggleBgActive]}>
+                  <View style={[styles.toggleThumb, isTwoFactorEnabled && styles.toggleThumbActive]} />
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.glassCardSq} activeOpacity={0.8} onPress={() => (navigation as any).navigate('PaymentMethods')}>
@@ -166,17 +181,17 @@ export const SettingsScreen = () => {
                   <MaterialIcons name="payments" size={24} color={colors.secondary} />
                 </View>
                 <View>
-                  <Text style={styles.cardTitle}>Payment Methods</Text>
-                  <Text style={styles.cardSub}>Visa •••• 4242</Text>
+                  <Text style={styles.cardTitle}>Payments</Text>
+                  <Text style={styles.cardSub}>Saved Methods</Text>
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.glassCardSq} activeOpacity={0.8} onPress={() => Alert.alert("Currency Configuration", "Multi-currency support is coming soon for international payments.")}>
-                <View style={[styles.iconBoxSq, { backgroundColor: 'rgba(71, 196, 255, 0.1)' }]}>
-                  <MaterialIcons name="currency-exchange" size={24} color={colors.tertiary} />
+              <TouchableOpacity style={styles.glassCardSq} activeOpacity={0.8} onPress={() => Alert.alert("Currency Configuration", "Multi-currency support is coming soon.")}>
+                <View style={[styles.iconBoxSq, { backgroundColor: 'rgba(144, 171, 255, 0.1)' }]}>
+                  <MaterialIcons name="currency-exchange" size={24} color={colors.primary} />
                 </View>
                 <View>
-                  <Text style={styles.cardTitle}>Currency Config</Text>
+                  <Text style={styles.cardTitle}>Currency</Text>
                   <Text style={styles.cardSub}>INR (₹)</Text>
                 </View>
               </TouchableOpacity>
@@ -195,13 +210,11 @@ export const SettingsScreen = () => {
             </View>
           </View>
 
-          {/* Security */}
+          {/* Security & Access */}
           <View style={styles.sectionBlock}>
-            <Text style={styles.sectionHeader}>SECURITY</Text>
+            <Text style={styles.sectionHeader}>ACCESS CONTROL</Text>
             <View style={styles.listContainerDk}>
-              <SettingsItem icon="face" title="WhatsApp Notification" showToggle toggleActive={whatsapp} onToggle={toggleWhatsapp} />
-              <View style={styles.divider} />
-              <SettingsItem icon="lock" title="Change Password" onPress={() => (navigation as any).navigate('Security')} />
+              <SettingsItem icon="chat" title="WhatsApp Communication" showToggle toggleActive={whatsapp} onToggle={toggleWhatsapp} />
               <View style={styles.divider} />
               <SettingsItem 
                 icon="fingerprint" 
@@ -211,7 +224,7 @@ export const SettingsScreen = () => {
                 onToggle={() => toggleBiometrics(!isBioEnabled)} 
               />
               <View style={styles.divider} />
-              <SettingsItem icon="verified-user" title="Two-Factor Auth" onPress={() => (navigation as any).navigate('Security')} />
+              <SettingsItem icon="help" title="Contact Support" onPress={() => Alert.alert("Support", "Support team is available 24/7.")} />
             </View>
           </View>
 

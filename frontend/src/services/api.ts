@@ -12,8 +12,12 @@ const getBaseUrl = () => {
     if (Platform.OS === 'web') {
       return 'http://10.102.57.101:5000/api';
     }
-    // For Mobile development (Android Emulator, iOS Simulator, or Physical Device)
-    // Using current machine IP: 10.102.57.101
+    // For Mobile development (using ADB reverse tunnel)
+    // This allows the physical phone to reach localhost on your PC via USB
+    if (Platform.OS === 'android') {
+      return 'http://127.0.0.1:5000/api';
+    }
+    // For iOS Simulator or others
     return 'http://10.102.57.101:5000/api';
   }
   // Production URL: Use environment variable if available, fallback to a placeholder

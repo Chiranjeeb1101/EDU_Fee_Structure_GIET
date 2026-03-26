@@ -59,6 +59,18 @@ class AuthService {
 
     const authId = authData.user.id;
 
+    // ── Profile Picture Logic ──
+    let finalProfilePic = profile_picture || null;
+    if (finalProfilePic && finalProfilePic.startsWith('data:image')) {
+      try {
+        const storageService = require('./storage.service');
+        // Since the user is not created yet, we'll use a temporary prefix or Just the college ID
+        finalProfilePic = await storageService.uploadProfilePicture(`new_${college_id_number}`, finalProfilePic);
+      } catch (err) {
+        console.warn('❌ Register: Storage upload failed, using Base64:', err.message);
+      }
+    }
+
     // 3. Insert into `users` table
     const { data: newUser, error: userError } = await supabase
       .from('users')
@@ -68,7 +80,7 @@ class AuthService {
           college_id: targetCollegeId,
           email: generatedEmail,
           personal_email: personal_email || null,
-          profile_picture: profile_picture || null,
+          profile_picture: finalProfilePic,
           full_name,
           role: 'student',
         },
@@ -393,7 +405,23 @@ class AuthService {
     const userUpdates = {};
     if (full_name) userUpdates.full_name = full_name;
     if (personal_email !== undefined) userUpdates.personal_email = personal_email;
-    if (profile_picture !== undefined) userUpdates.profile_picture = profile_picture;
+    
+    // ── Profile Picture Logic: Move from Base64 to Storage ──
+    if (profile_picture) {
+      if (profile_picture.startsWith('data:image')) {
+        try {
+          const storageService = require('./storage.service');
+          const publicUrl = await storageService.uploadProfilePicture(userId, profile_picture);
+          userUpdates.profile_picture = publicUrl;
+          console.log(`📸 Profile picture uploaded to Storage for user: ${userId}`);
+        } catch (uploadError) {
+          console.error('❌ Failed to upload profile pic to storage, falling back to Base64:', uploadError.message);
+          userUpdates.profile_picture = profile_picture; // Fallback
+        }
+      } else {
+        userUpdates.profile_picture = profile_picture;
+      }
+    }
 
     if (Object.keys(userUpdates).length > 0) {
       const { error: userError } = await supabase

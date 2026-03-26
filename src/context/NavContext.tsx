@@ -1,3 +1,0 @@
-import React from 'react';
-
-export const NavContext = React.createContext({ isNavVisible: true });

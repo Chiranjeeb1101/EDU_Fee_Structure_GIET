@@ -89,3 +89,9 @@ exports.deleteDocument = async (req, res) => {
   await studentService.deleteDocument(userId, id);
   res.status(200).json({ success: true, message: 'Document deleted' });
 };
+
+exports.getCalendarEvents = async (req, res) => {
+  const userId = req.user.id;
+  const events = await studentService.getCalendarEvents(userId);
+  res.status(200).json({ success: true, data: events });
+};

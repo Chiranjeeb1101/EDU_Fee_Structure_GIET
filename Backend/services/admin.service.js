@@ -330,13 +330,17 @@ class AdminService {
           .update(userUpdates)
           .eq('id', currentStudent.user_id);
 
-        // Notify student about profile update
-        await this.createNotification(
-          currentStudent.user_id,
-          'Profile Updated',
-          'Admin has updated your profile details (Name/Email).',
-          'info'
-        );
+        // Notify student about profile update (non-critical)
+        try {
+          await this.createNotification(
+            currentStudent.user_id,
+            'Profile Updated',
+            'Admin has updated your profile details (Name/Email).',
+            'info'
+          );
+        } catch (err) {
+          console.warn('⚠️  Notification failed for profile update:', err.message);
+        }
       }
     }
 
@@ -371,13 +375,17 @@ class AdminService {
       }
 
       if (feeChanged) {
-        // Notify student about fee update
-        await this.createNotification(
-          currentStudent.user_id,
-          'Fees Updated',
-          `Admin has updated your fee details. New Total: ₹${Number(studentUpdates.total_fee).toLocaleString()}`,
-          'warning'
-        );
+        // Notify student about fee update (non-critical)
+        try {
+          await this.createNotification(
+            currentStudent.user_id,
+            'Fees Updated',
+            `Admin has updated your fee details. New Total: ₹${Number(studentUpdates.total_fee).toLocaleString()}`,
+            'warning'
+          );
+        } catch (err) {
+          console.warn('⚠️  Notification failed for fee update:', err.message);
+        }
       }
     }
 

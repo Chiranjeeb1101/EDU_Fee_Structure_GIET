@@ -1,5 +1,5 @@
 // ─── Load environment variables ─────────────────────────────────────
-require('dotenv').config();
+require('dotenv').config({ override: true });
 
 const express = require('express');
 const cors = require('cors');
@@ -26,7 +26,7 @@ app.use(
 );
 
 // ─── Body parsing for all other routes ─────────────────────────────
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(sanitize);                   // Strip XSS from string inputs
 
@@ -41,16 +41,34 @@ app.use((_req, res) => {
   });
 });
 
+const fs = require('fs');
+const path = require('path');
+const logStream = fs.createWriteStream(path.join(__dirname, 'api-debug.log'), { flags: 'a' });
+
 // ─── Global error handler ──────────────────────────────────────────
 // eslint-disable-next-line no-unused-vars
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
+  const logMsg = `[ERROR] ${new Date().toISOString()} | ${req.method} ${req.url} | ${err.stack || err}\n`;
   console.error('🔥 Unhandled error:', err.stack || err);
+  logStream.write(logMsg);
   const statusCode = err.statusCode || 500;
   res.status(statusCode).json({
     success: false,
     message: err.message || 'Internal Server Error',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
+});
+
+app.use((req, res, next) => {
+  const oldSend = res.send;
+  res.send = function (data) {
+    if (req.url.includes('/auth/update-profile')) {
+      const logBody = typeof data === 'string' ? data : JSON.stringify(data);
+      logStream.write(`[RES] ${new Date().toISOString()} | ${req.method} ${req.url} | STATUS: ${res.statusCode} | BODY: ${logBody.substring(0, 200)}\n`);
+    }
+    oldSend.apply(res, arguments);
+  };
+  next();
 });
 
 // ─── Start server ──────────────────────────────────────────────────
