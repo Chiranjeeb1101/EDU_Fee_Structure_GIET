@@ -1,0 +1,33 @@
+{
+  "name": "edu-fee-structure-backend",
+  "version": "1.0.0",
+  "description": "Smart Fee Management System — multi-tenant backend",
+  "main": "server.js",
+  "scripts": {
+    "predev": "node ../frontend/scripts/update-ip.js",
+    "start": "npm run predev && node server.js",
+    "dev": "npm run predev && nodemon server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.99.3",
+    "axios": "^1.13.6",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.3",
+    "pdfkit": "^0.18.0",
+    "pg": "^8.20.0",
+    "resend": "^6.9.4",
+    "stripe": "^20.4.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
