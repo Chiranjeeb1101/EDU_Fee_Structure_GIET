@@ -12,6 +12,7 @@ const { sanitize } = require('./middleware/validate');
 
 // ─── Initialise Express ────────────────────────────────────────────
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy
 const PORT = process.env.PORT || 5000;
 
 // ─── Security middleware ───────────────────────────────────────────
