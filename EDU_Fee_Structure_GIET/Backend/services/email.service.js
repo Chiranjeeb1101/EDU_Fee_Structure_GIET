@@ -1,21 +1,35 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+// Force IPv4 resolution to prevent ENETUNREACH in Render/Docker environments
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 class EmailService {
   constructor() {
-    this.resend = null;
+    this.transporter = null;
     this._init();
   }
 
   _init() {
-    const apiKey = process.env.RESEND_API_KEY;
+    const email = process.env.SMTP_EMAIL;
+    const pass  = process.env.SMTP_APP_PASSWORD;
 
-    if (!apiKey) {
-      console.warn('⚠️  RESEND_API_KEY not set — email service disabled.');
+    if (!email || !pass) {
+      console.warn('⚠️  SMTP_EMAIL or SMTP_APP_PASSWORD not set — email service disabled.');
       return;
     }
 
-    this.resend = new Resend(apiKey);
-    console.log(`📧 Email service ready (Resend API)`);
+    this.transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // STARTTLS
+      requireTLS: true,
+      auth: { user: email, pass },
+    });
+
+    console.log(`📧 Email service ready (${email})`);
   }
 
   // ─── Shared HTML wrapper ────────────────────────────────────────
@@ -59,7 +73,7 @@ class EmailService {
 
   // ─── Payment Confirmation Email ─────────────────────────────────
   async sendPaymentConfirmation({ to, studentName, collegeId, amount, remainingFee, paymentId, stream, year }) {
-    if (!this.resend) return { success: false, error: 'Resend API not initialized' };
+    if (!this.transporter) return { success: false, error: 'SMTP not initialized' };
 
     const html = this._wrapHtml(`
       <div class="header">
@@ -110,7 +124,7 @@ class EmailService {
 
   // ─── Fee Reminder Email ─────────────────────────────────────────
   async sendFeeReminder({ to, studentName, collegeId, remainingFee, stream, year, dueDate }) {
-    if (!this.resend) return { success: false, error: 'Resend API not initialized' };
+    if (!this.transporter) return { success: false, error: 'SMTP not initialized' };
 
     const dueLine = dueDate
       ? `<p style="color:#f59e0b;font-weight:600">⏰ Due Date: ${dueDate}</p>`
@@ -156,7 +170,7 @@ class EmailService {
 
   // ─── Admin Broadcast Email ──────────────────────────────────────
   async sendBroadcast({ to, studentName, subject, message }) {
-    if (!this.resend) return { success: false, error: 'Resend API not initialized' };
+    if (!this.transporter) return { success: false, error: 'SMTP not initialized' };
 
     // Convert newlines to <br> for HTML rendering
     const htmlMessage = message.replace(/\n/g, '<br>');
@@ -181,23 +195,15 @@ class EmailService {
   // ─── Core Send Method ───────────────────────────────────────────
   async _send({ to, subject, html }) {
     try {
-      // Note: On Resend's free tier, you must use "onboarding@resend.dev"
-      // and can ONLY send to the email address you verified your account with.
-      // To send to real students, domain verification is required on the Resend dashboard.
-      const { data, error } = await this.resend.emails.send({
-        from: 'EDU-Fee GIET <onboarding@resend.dev>',
-        to: [to],
+      const info = await this.transporter.sendMail({
+        from: `"EDU-Fee GIET" <${process.env.SMTP_EMAIL}>`,
+        to,
         subject,
         html,
       });
 
-      if (error) {
-        console.error(`❌ Resend API failed to ${to}:`, error.message);
-        return { success: false, error: error.message };
-      }
-
-      console.log(`📧 Email sent to ${to} via Resend — ${data.id}`);
-      return { success: true, messageId: data.id };
+      console.log(`📧 Email sent to ${to} — ${info.messageId}`);
+      return { success: true, messageId: info.messageId };
     } catch (err) {
       console.error(`❌ Email failed to ${to}:`, err.message);
       return { success: false, error: err.message };
